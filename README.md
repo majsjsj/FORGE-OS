@@ -58,6 +58,10 @@ A manual GitHub Actions workflow can build the demo Flutter project into an APK 
 
 See [FORGE AI setup](docs/FORGE-AI.md). Configure `FORGE_MODEL_BASE_URL` and `FORGE_MODEL_NAME` for an OpenAI-compatible endpoint such as a local Ollama server. FORGE does not yet ship its own trained foundation-model weights.
 
+## Chat-operated studio roadmap
+
+See [chat-operated studio architecture](docs/CHAT-OPERATED-STUDIO.md) for the required remote MCP control plane, isolated cloud builds, per-user encrypted secret vault, approval gates, and verified engine delivery gates. The `forge-studio` Claude Code skill defines safe project execution and honest capability reporting. Phone-only remote control is not deployed yet: the current MCP configuration is local stdio, and the Flutter workflow still requires a manual GitHub Actions launch.
+
 ## MCP tools
 
 The stdio MCP server exposes project inspection, safe file operations, planning/routing, studio scaffolding, model status/chat, screenshot comparison, image metadata, and Python pytest. Open this repository in an MCP-compatible host. The checked-in `.mcp.json` is configured for Claude Code.
