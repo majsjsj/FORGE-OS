@@ -84,7 +84,7 @@ def build_project(root: str, relative_path: str, target: str, timeout: int = 180
         output.parent.mkdir(parents=True, exist_ok=True)
         args = [exe, "-batchmode", "-quit", "-projectPath", str(project),
                 "-buildTarget", "Android", "-executeMethod", "BuildScript.BuildAndroid",
-                "-logFile", "-", "-customBuildPath", str(output)]
+                "-logFile", "-"]
     return _run(args, project, timeout)
 
 
