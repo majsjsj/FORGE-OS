@@ -4,11 +4,11 @@ from dataclasses import asdict, dataclass
 from forge_os.core.planner import create_plan
 
 AGENTS = {
-    "architect": {"skills": ["requirements", "architecture"], "studio": ["web", "android", "game", "saas", "api"]},
+    "architect": {"skills": ["requirements", "architecture"], "studio": ["web", "android", "flutter", "game", "godot", "unity", "saas", "api"]},
     "frontend": {"skills": ["ui", "accessibility", "responsive"], "studio": ["web", "saas"]},
     "backend": {"skills": ["api", "database", "auth"], "studio": ["api", "saas"]},
-    "android": {"skills": ["gradle", "android", "mobile"], "studio": ["android"]},
-    "game_developer": {"skills": ["gameplay", "physics", "rendering"], "studio": ["game"]},
+    "android": {"skills": ["gradle", "android", "mobile"], "studio": ["android", "flutter"]},
+    "game_developer": {"skills": ["gameplay", "physics", "rendering"], "studio": ["game", "godot", "unity"]},
     "qa": {"skills": ["testing", "verification"], "studio": ["web", "android", "game", "saas", "api"]},
     "security": {"skills": ["threat_model", "secrets", "dependencies"], "studio": ["web", "android", "game", "saas", "api"]},
 }
@@ -32,8 +32,11 @@ def detect_studio(brief: str, requested: str = "auto") -> str:
             raise ValueError("Unsupported studio.")
         return requested
     s = brief.lower()
+    if "flutter" in s: return "flutter"
+    if "godot" in s: return "godot"
+    if "unity" in s: return "unity"
     if any(x in s for x in ("android", "apk", "aab", "mobile app")): return "android"
-    if any(x in s for x in ("game", "unity", "godot", "2d", "3d")): return "game"
+    if any(x in s for x in ("game", "2d", "3d")): return "game"
     if any(x in s for x in ("saas", "subscription", "multi-tenant")): return "saas"
     if any(x in s for x in ("api", "backend", "microservice")): return "api"
     return "web"
