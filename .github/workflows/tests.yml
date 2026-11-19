@@ -18,3 +18,7 @@ jobs:
       - run: uv sync --dev
       - run: uv run pytest
       - run: uv run ruff check .
+      - name: Check web game JavaScript
+        run: node --check workspace/web-game/game.js
+      - name: Check browser studio JavaScript
+        run: node --check studio/studio.js
