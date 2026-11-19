@@ -1,8 +1,8 @@
 """Provider-neutral chat gateway for a locally hosted or remote OpenAI-compatible model."""
 import json
 import os
-import urllib.request
 import urllib.error
+import urllib.request
 
 
 class ModelNotConfigured(RuntimeError):
