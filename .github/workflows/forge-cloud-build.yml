@@ -1,0 +1,135 @@
+name: FORGE Cloud Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_path:
+        description: "Path to an existing Flutter project inside this repository"
+        required: true
+        default: "workspace/mobile-app"
+        type: string
+      build_target:
+        description: "Android package to build"
+        required: true
+        default: "apk"
+        type: choice
+        options: [apk, aab]
+      engine:
+        description: "Cloud build engine (Flutter is the first supported target)"
+        required: true
+        default: "flutter"
+        type: choice
+        options: [flutter]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-cloud-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  flutter-android:
+    name: Build Flutter Android
+    if: ${{ inputs.engine == 'flutter' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Validate project path
+        id: project
+        env:
+          REQUESTED_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path, PurePosixPath
+
+          raw = os.environ["REQUESTED_PATH"].strip()
+          path = PurePosixPath(raw)
+          if not raw or path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
+              raise SystemExit("project_path must be a relative path inside this repository")
+          if "\\" in raw or ":" in raw:
+              raise SystemExit("project_path contains an unsupported character")
+          root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          target = (root / Path(*path.parts)).resolve()
+          if target == root or root not in target.parents or not target.is_dir():
+              raise SystemExit("project_path must point to an existing directory inside the repository")
+          if not (target / "pubspec.yaml").is_file():
+              raise SystemExit("No pubspec.yaml found; this workflow currently builds Flutter projects only")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"path={target}\n")
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Prepare Android platform files
+        working-directory: ${{ steps.project.outputs.path }}
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android --project-name forge_app .
+          fi
+
+      - name: Resolve dependencies
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter pub get
+
+      - name: Analyze project
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter analyze
+
+      - name: Run tests when present
+        working-directory: ${{ steps.project.outputs.path }}
+        run: |
+          if [ -d test ] && find test -type f -name '*_test.dart' -print -quit | grep -q .; then
+            flutter test
+          else
+            echo "No Dart tests found; skipping."
+          fi
+
+      - name: Build APK
+        if: ${{ inputs.build_target == 'apk' }}
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter build apk --release
+
+      - name: Build AAB
+        if: ${{ inputs.build_target == 'aab' }}
+        working-directory: ${{ steps.project.outputs.path }}
+        run: flutter build appbundle --release
+
+      - name: Verify output
+        env:
+          BUILD_TARGET: ${{ inputs.build_target }}
+          PROJECT_DIR: ${{ steps.project.outputs.path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ["PROJECT_DIR"])
+          target = os.environ["BUILD_TARGET"]
+          artifact = root / ("build/app/outputs/flutter-apk/app-release.apk" if target == "apk" else "build/app/outputs/bundle/release/app-release.aab")
+          if not artifact.is_file() or artifact.stat().st_size == 0:
+              raise SystemExit(f"Expected build artifact missing or empty: {artifact}")
+          print(f"Verified {artifact} ({artifact.stat().st_size} bytes)")
+          PY
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-${{ inputs.build_target }}-${{ github.run_number }}
+          path: ${{ steps.project.outputs.path }}/build/app/outputs/${{ inputs.build_target == 'apk' && 'flutter-apk/app-release.apk' || 'bundle/release/app-release.aab' }}
+          if-no-files-found: error
+          retention-days: 7
