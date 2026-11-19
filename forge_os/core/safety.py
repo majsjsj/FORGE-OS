@@ -20,12 +20,22 @@ def resolve_workspace(root: str | Path) -> Path:
 
 def safe_path(root: str | Path, relative_path: str, *, for_write: bool = False) -> Path:
     base = resolve_workspace(root)
-    if not relative_path or "\x00" in relative_path:
+    if not relative_path or "\\x00" in relative_path:
         raise WorkspaceError("A valid relative path is required.")
-    candidate_input = Path(relative_path)
-    if candidate_input.is_absolute():
+    supplied = Path(relative_path)
+    if supplied.is_absolute():
         raise WorkspaceError("Absolute paths are not allowed.")
-    candidate = (base / candidate_input).resolve()
+    lexical = base / supplied
+    # Reject symlinks in every existing component before resolving; otherwise resolve()
+    # would hide the fact that the caller traversed a symlink.
+    current = base
+    for part in supplied.parts:
+        if part in {"", "."}: continue
+        if part == "..": raise WorkspaceError("Parent traversal is not allowed.")
+        current = current / part
+        if current.is_symlink():
+            raise WorkspaceError("Symbolic links are not allowed in workspace paths.")
+    candidate = lexical.resolve()
     try:
         candidate.relative_to(base)
     except ValueError as exc:
@@ -36,6 +46,4 @@ def safe_path(root: str | Path, relative_path: str, *, for_write: bool = False) 
     name = candidate.name.lower()
     if name in BLOCKED_NAMES or name.startswith(".env"):
         raise WorkspaceError("Access to secret/configuration files is blocked.")
-    if for_write and candidate.exists() and candidate.is_symlink():
-        raise WorkspaceError("Writing through symbolic links is not allowed.")
     return candidate
