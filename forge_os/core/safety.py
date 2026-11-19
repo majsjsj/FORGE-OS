@@ -1,0 +1,41 @@
+"""Workspace path validation and sensitive-file protections."""
+from pathlib import Path
+
+BLOCKED_PARTS = {".git", ".ssh", ".aws", ".azure", ".gnupg", "__pycache__", ".venv", "venv", "node_modules"}
+BLOCKED_NAMES = {".env", ".env.local", ".env.production", "id_rsa", "id_ed25519", "credentials", "secrets.json"}
+MAX_READ_BYTES = 200_000
+MAX_WRITE_BYTES = 200_000
+
+
+class WorkspaceError(ValueError):
+    """Raised when an operation violates workspace policy."""
+
+
+def resolve_workspace(root: str | Path) -> Path:
+    path = Path(root).expanduser().resolve()
+    if not path.exists() or not path.is_dir():
+        raise WorkspaceError(f"Workspace directory does not exist: {path}")
+    return path
+
+
+def safe_path(root: str | Path, relative_path: str, *, for_write: bool = False) -> Path:
+    base = resolve_workspace(root)
+    if not relative_path or "\x00" in relative_path:
+        raise WorkspaceError("A valid relative path is required.")
+    candidate_input = Path(relative_path)
+    if candidate_input.is_absolute():
+        raise WorkspaceError("Absolute paths are not allowed.")
+    candidate = (base / candidate_input).resolve()
+    try:
+        candidate.relative_to(base)
+    except ValueError as exc:
+        raise WorkspaceError("Path escapes the configured workspace.") from exc
+    parts = candidate.relative_to(base).parts
+    if any(part in BLOCKED_PARTS for part in parts):
+        raise WorkspaceError("Access to this directory is blocked.")
+    name = candidate.name.lower()
+    if name in BLOCKED_NAMES or name.startswith(".env"):
+        raise WorkspaceError("Access to secret/configuration files is blocked.")
+    if for_write and candidate.exists() and candidate.is_symlink():
+        raise WorkspaceError("Writing through symbolic links is not allowed.")
+    return candidate
