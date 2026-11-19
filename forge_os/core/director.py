@@ -28,7 +28,7 @@ class Assignment:
 
 def detect_studio(brief: str, requested: str = "auto") -> str:
     if requested != "auto":
-        if requested not in {"web", "android", "game", "saas", "api"}:
+        if requested not in {"web", "android", "flutter", "game", "godot", "unity", "saas", "api"}:
             raise ValueError("Unsupported studio.")
         return requested
     s = brief.lower()
@@ -45,8 +45,8 @@ def direct(brief: str, studio: str = "auto") -> dict:
     assignments = []
     for task in plan["tasks"]:
         agent = ROUTES.get(task["id"], "architect")
-        if selected == "android" and task["id"] == "T3": agent = "android"
-        if selected == "game" and task["id"] == "T3": agent = "game_developer"
+        if selected in {"android", "flutter"} and task["id"] == "T3": agent = "android"
+        if selected in {"game", "godot", "unity"} and task["id"] == "T3": agent = "game_developer"
         if selected in {"api", "saas"} and task["id"] == "T3": agent = "backend"
         assignments.append(asdict(Assignment(task["id"], agent, f"{agent} owns the {task['title'].lower()} workstream.")))
     return {"director": "FORGE DIRECTOR", "studio": selected, "brief": plan["brief"],
