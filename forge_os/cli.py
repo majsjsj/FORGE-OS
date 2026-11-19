@@ -4,9 +4,9 @@ import json
 from forge_os.core.director import direct
 from forge_os.core.planner import create_plan
 from forge_os.models.gateway import model_status
-from forge_os.studios.scaffold import scaffold
-from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
 from forge_os.studios.ads import create_admob_plan
+from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
+from forge_os.studios.scaffold import scaffold
 from forge_os.tools.project import inspect_project
 
 
@@ -44,7 +44,7 @@ def main() -> None:
     ads.add_argument("path")
     ads.add_argument("--platform", choices=["android", "flutter", "unity", "godot"], default="android")
     ads.add_argument("--formats", default="banner,interstitial,rewarded")
-    status = commands.add_parser("model-status")
+    commands.add_parser("model-status")
     args = parser.parse_args()
     if args.command == "plan":
         result = create_plan(args.brief, args.type)
