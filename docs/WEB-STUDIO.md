@@ -25,3 +25,12 @@ Open `studio/index.html`. It loads the Monaco editor (the editor engine used by 
 
 ## Current limits
 This is an early prototype, not a production game or a complete cloud IDE. The editor does not yet commit files, run a full browser automation suite, or provide remote multiplayer. Visual QA still needs a human pass on real desktop and mobile browsers.
+
+## Publish on GitHub Pages
+
+The `.github/workflows/deploy-web-studio.yml` workflow publishes the landing page, editor, and game for free on GitHub Pages whenever these web files change. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** once in the repository. After the first successful deployment, the public URLs are:
+- `https://majsjsj.github.io/FORGE-OS/` — web lab landing page
+- `https://majsjsj.github.io/FORGE-OS/studio/` — code editor and live preview
+- `https://majsjsj.github.io/FORGE-OS/workspace/web-game/` — game
+
+The deployment URL is not considered live until the Pages workflow succeeds.
