@@ -49,7 +49,7 @@ jobs:
 
           raw = os.environ["REQUESTED_PATH"].strip()
           path = PurePosixPath(raw)
-          if not raw or path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
+          if not raw or "\\n" in raw or "\\r" in raw or path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
               raise SystemExit("project_path must be a relative path inside this repository")
           if "\\" in raw or ":" in raw:
               raise SystemExit("project_path contains an unsupported character")
