@@ -11,7 +11,13 @@ from forge_os.models.gateway import chat, model_status
 from forge_os.studios.ads import create_admob_plan
 from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
 from forge_os.studios.scaffold import scaffold
-from forge_os.tools.project import inspect_project, list_files, read_file, run_python_tests, write_file
+from forge_os.tools.project import (
+    inspect_project,
+    list_files,
+    read_file,
+    run_python_tests,
+    write_file,
+)
 
 mcp = FastMCP("FORGE-OS")
 DEFAULT_ROOT = os.environ.get("FORGE_WORKSPACE", ".")
