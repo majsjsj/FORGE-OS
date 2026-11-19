@@ -1,0 +1,21 @@
+(() => {
+const paths={html:'../workspace/web-game/index.html',css:'../workspace/web-game/style.css',js:'../workspace/web-game/game.js'};
+const names={html:'index.html',css:'style.css',js:'game.js'},langs={html:'html',css:'css',js:'javascript'};
+const models={},originals={};let active='html',editor=null,monacoReady=false;
+const $=id=>document.getElementById(id),fallback=$('fallback'),frame=$('preview'),logs=$('logs');
+function log(message,error=false){const p=document.createElement('p');p.textContent=(error?'✕ ':'✓ ')+message;if(error)p.className='error';logs.appendChild(p);logs.scrollTop=logs.scrollHeight}
+function setSave(s){$('saveState').textContent='● '+s}
+async function loadFiles(){for(const key of Object.keys(paths)){try{const r=await fetch(paths[key]);if(!r.ok)throw Error('HTTP '+r.status);const code=await r.text();originals[key]=code;const saved=localStorage.getItem('forge-draft-'+key);models[key]=saved??code;}catch(e){models[key]='';originals[key]='';log('Could not load '+names[key]+': '+e.message,true)}}}
+function current(){return editor&&monacoReady?editor.getValue():fallback.value}
+function store(){models[active]=current();localStorage.setItem('forge-draft-'+active,models[active]);setSave('LOCAL DRAFT SAVED')}
+function select(key){if(editor&&monacoReady){store();editor.setModel(monaco.editor.createModel(models[key],langs[key]));}else fallback.value=models[key]||'';active=key;document.querySelectorAll('.file').forEach(b=>b.classList.toggle('active',b.dataset.file===key));$('activeTab').innerHTML='<span class="file-icon '+(key==='html'?'html':key==='css'?'css':'js')+'">'+(key==='html'?'‹›':key==='css'?'▧':'JS')+'</span> '+names[key]+' <span class="tab-x">×</span>';$('language').textContent=key.toUpperCase()+' · '+(monacoReady?'MONACO':'TEXT EDITOR')}
+function preview(){store();const html=models.html.replace('<link rel="stylesheet" href="style.css">','<style>'+models.css.replace(/<\/style/gi,'<\\/style')+'</style>').replace('<script src="game.js"><\/script>','<script>'+models.js.replace(/<\/script/gi,'<\\/script')+'<\/script>');frame.srcdoc=html;log('Preview refreshed from current editor contents.');}
+function reset(){for(const k of Object.keys(paths)){models[k]=originals[k];localStorage.removeItem('forge-draft-'+k)}select(active);setSave('RESET TO REPOSITORY');log('Local drafts reset to repository versions.')}
+document.querySelectorAll('.file').forEach(b=>b.addEventListener('click',()=>select(b.dataset.file)));
+$('runBtn').onclick=preview;$('resetBtn').onclick=reset;$('clearLog').onclick=()=>logs.innerHTML='';$('popout').onclick=()=>{const w=window.open();if(w){w.document.open();w.document.write(frame.srcdoc);w.document.close()}};
+document.querySelectorAll('.device').forEach(b=>b.onclick=()=>{document.querySelectorAll('.device').forEach(x=>x.classList.remove('active'));b.classList.add('active');frame.classList.toggle('mobile',b.dataset.size==='mobile')});
+fallback.addEventListener('input',()=>{models[active]=fallback.value;localStorage.setItem('forge-draft-'+active,models[active]);setSave('LOCAL DRAFT SAVED')});
+async function start(){await loadFiles();if(window.require){require.config({paths:{vs:'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs'}});require(['vs/editor/editor.main'],()=>{monacoReady=true;fallback.style.display='none';$('editor').style.display='block';editor=monaco.editor.create($('editor'),{value:models.html,language:'html',theme:'vs-dark',automaticLayout:true,minimap:{enabled:false},fontSize:12,lineNumbers:'on',scrollBeyondLastLine:false,wordWrap:'on',tabSize:2,roundedSelection:false,renderLineHighlight:'line'});editor.onDidChangeModelContent(()=>{models[active]=editor.getValue();localStorage.setItem('forge-draft-'+active,models[active]);setSave('LOCAL DRAFT SAVED')});$('language').textContent='HTML · MONACO';log('Monaco loaded — VS Code editor engine ready.');},()=>fallbackMode());}else fallbackMode();select('html');preview();}
+function fallbackMode(){fallback.style.display='block';$('editor').style.display='none';$('language').textContent='TEXT EDITOR · FALLBACK';log('Monaco CDN unavailable; using basic editor fallback.',true)}
+start();
+})();
