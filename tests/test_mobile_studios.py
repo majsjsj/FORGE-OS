@@ -1,4 +1,5 @@
 import json
+
 import pytest
 
 from forge_os.studios.ads import create_admob_plan
