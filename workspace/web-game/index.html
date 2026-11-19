@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090b18"><meta name="description" content="ECHO//ME — a time-loop puzzle platformer.">
+  <title>ECHO//ME — Remember your moves</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="#"><span class="brand-mark">E</span><span>ECHO<span class="slash">//</span>ME</span></a><div class="top-meta"><span class="live-dot"></span> SOLO EXPERIMENT <span class="build">PROTOTYPE 0.1</span></div></header>
+    <section class="intro"><div><p class="eyebrow">A PUZZLE ABOUT YOUR PAST</p><h1>Your past is<br><em>the key.</em></h1><p class="lede">Record an attempt. Leave an echo. Then work together with the version of you that came before.</p></div><div class="level-card"><span>CHAPTER 01</span><strong>The First Loop</strong><small>01 / 03 · BEGINNER</small></div></section>
+    <section class="game-wrap">
+      <div class="game-head"><div><span class="level-tag">01</span><strong>THE WAITING ROOM</strong></div><div class="stats"><span>⏱ <b id="timer">00:00</b></span><span>↻ <b id="loops">0</b> ECHOES</span></div></div>
+      <div class="stage"><canvas id="game" width="960" height="540" aria-label="ECHO//ME puzzle platformer"></canvas><div class="stage-vignette"></div><div class="stage-hint" id="hint">Reach the exit. Your echo can hold the switch.</div><div class="toast" id="toast" role="status"></div></div>
+      <div class="game-controls"><div class="key-help"><span><kbd>A</kbd><kbd>D</kbd> / <kbd>←</kbd><kbd>→</kbd> MOVE</span><span><kbd>SPACE</kbd> JUMP</span><span><kbd>E</kbd> LOCK ECHO</span></div><div class="actions"><button id="echoBtn" class="btn btn-primary">◉ Lock Echo <kbd>E</kbd></button><button id="resetBtn" class="btn btn-quiet">↻ Restart <kbd>R</kbd></button></div></div>
+      <div class="touch-controls"><button data-key="left">←</button><button data-key="jump">↑</button><button data-key="right">→</button><button id="touchEcho">LOCK ECHO</button></div>
+    </section>
+    <footer><span>DESIGNED TO BE SOLVED TOGETHER — BY YOU.</span><span>FORGE-OS WEB GAME LAB</span></footer>
+  </main><script src="game.js"></script>
+</body></html>
