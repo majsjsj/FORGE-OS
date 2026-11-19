@@ -1,4 +1,4 @@
-from forge_os.core.director import direct, detect_studio
+from forge_os.core.director import detect_studio, direct
 
 
 def test_director_routes_android():
