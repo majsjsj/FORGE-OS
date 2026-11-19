@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "forge-os": {
+      "command": "uv",
+      "args": ["run", "--directory", ".", "forge-mcp"],
+      "env": { "FORGE_WORKSPACE": "." }
+    }
+  }
+}
