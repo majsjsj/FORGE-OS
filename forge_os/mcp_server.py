@@ -1,8 +1,12 @@
-"""MCP stdio server for Claude and other MCP clients."""
+"""MCP stdio server for Claude and other MCP clients; tools also serve other MCP hosts."""
 import os
 from mcp.server.fastmcp import FastMCP
 from forge_os.core.planner import create_plan
+from forge_os.core.director import direct
 from forge_os.core.safety import resolve_workspace
+from forge_os.engines.vision import compare_images, image_info
+from forge_os.models.gateway import chat, model_status
+from forge_os.studios.scaffold import scaffold
 from forge_os.tools.project import inspect_project, list_files, read_file, run_python_tests, write_file
 
 mcp = FastMCP("FORGE-OS")
@@ -41,6 +45,43 @@ def forge_write_file(relative_path: str, content: str, root: str | None = None) 
 def forge_create_plan(brief: str, project_type: str = "auto") -> dict:
     """Create a structured implementation plan for a software project."""
     return create_plan(brief, project_type)
+
+
+@mcp.tool()
+def forge_direct(brief: str, studio: str = "auto") -> dict:
+    """Route a project brief to a studio and specialist agents. Planning only; does not claim agents executed."""
+    return direct(brief, studio)
+
+
+@mcp.tool()
+def forge_scaffold_studio(studio: str, destination: str, root: str | None = None) -> dict:
+    """Create a non-overwriting starter project for web, Android, game, SaaS, or API."""
+    return scaffold(_root(root), studio, destination)
+
+
+@mcp.tool()
+def forge_model_status() -> dict:
+    """Report whether a FORGE AI compatible model endpoint is configured."""
+    return model_status()
+
+
+@mcp.tool()
+def forge_model_chat(messages: list[dict]) -> dict:
+    """Send messages to the configured FORGE model endpoint. Requires explicit local endpoint configuration."""
+    return chat(messages)
+
+
+@mcp.tool()
+def forge_image_info(relative_path: str, root: str | None = None) -> dict:
+    """Read image dimensions and metadata for a reference or rendered screenshot."""
+    return image_info(_root(root), relative_path)
+
+
+@mcp.tool()
+def forge_compare_screenshots(reference: str, rendered: str, output: str = "forge-diff.png",
+                              root: str | None = None) -> dict:
+    """Compare two screenshots with a basic pixel metric and save a difference image."""
+    return compare_images(_root(root), reference, rendered, output)
 
 
 @mcp.tool()
