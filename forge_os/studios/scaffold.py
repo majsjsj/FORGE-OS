@@ -1,5 +1,6 @@
 """Small, deterministic starter project scaffolds for FORGE studios."""
 from pathlib import Path
+
 from forge_os.core.safety import safe_path
 
 TEMPLATES = {
