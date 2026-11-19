@@ -93,8 +93,9 @@ def play_store_package(root: str, relative_path: str, app_name: str,
                        full_description: str, privacy_policy_url: str = "") -> dict:
     """Write a human-reviewable Play listing checklist; does not publish."""
     import json
-    if not package_id or "." not in package_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_." for c in package_id):
-        raise ValueError("package_id must be a reverse-DNS identifier")
+    import re
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+", package_id):
+        raise ValueError("package_id must be a valid reverse-DNS application ID")
     if len(short_description) > 80:
         raise ValueError("short_description must be 80 characters or fewer")
     if not app_name.strip() or not full_description.strip():
