@@ -77,9 +77,9 @@ def forge_toolchains() -> dict:
 
 @mcp.tool()
 def forge_build_mobile(relative_path: str, target: str, root: str | None = None,
-                       timeout_seconds: int = 1800) -> dict:
-    """Build a supported local Android project to APK/AAB or invoke Godot/Unity Android export."""
-    return build_project(_root(root), relative_path, target, timeout_seconds)
+                       timeout_seconds: int = 1800, approved: bool = False) -> dict:
+    """Build APK/AAB or export Godot/Unity Android. Review build scripts and set approved=True to authorize execution."""
+    return build_project(_root(root), relative_path, target, timeout_seconds, approved)
 
 
 @mcp.tool()
