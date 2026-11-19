@@ -1,7 +1,14 @@
 """Safe project operations exposed through MCP."""
 import subprocess
 import sys
-from forge_os.core.safety import MAX_READ_BYTES, MAX_WRITE_BYTES, WorkspaceError, resolve_workspace, safe_path
+
+from forge_os.core.safety import (
+    MAX_READ_BYTES,
+    MAX_WRITE_BYTES,
+    WorkspaceError,
+    resolve_workspace,
+    safe_path,
+)
 
 
 def inspect_project(root: str) -> dict:
