@@ -1,5 +1,6 @@
 """Image metadata and screenshot comparison using optional Pillow."""
 from pathlib import Path
+
 from forge_os.core.safety import safe_path
 
 
