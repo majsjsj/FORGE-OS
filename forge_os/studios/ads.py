@@ -1,6 +1,7 @@
 """Generate a safe AdMob integration plan without embedding real ad identifiers."""
-from pathlib import Path
 import json
+from pathlib import Path
+
 from forge_os.core.safety import safe_path
 
 
