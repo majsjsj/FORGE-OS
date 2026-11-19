@@ -7,6 +7,8 @@ from forge_os.core.safety import resolve_workspace
 from forge_os.engines.vision import compare_images, image_info
 from forge_os.models.gateway import chat, model_status
 from forge_os.studios.scaffold import scaffold
+from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
+from forge_os.studios.ads import create_admob_plan
 from forge_os.tools.project import inspect_project, list_files, read_file, run_python_tests, write_file
 
 mcp = FastMCP("FORGE-OS")
@@ -55,8 +57,37 @@ def forge_direct(brief: str, studio: str = "auto") -> dict:
 
 @mcp.tool()
 def forge_scaffold_studio(studio: str, destination: str, root: str | None = None) -> dict:
-    """Create a non-overwriting starter project for web, Android, game, SaaS, or API."""
+    """Create a non-overwriting starter for web, Android, Flutter, Unity, Godot, game, SaaS, or API."""
     return scaffold(_root(root), studio, destination)
+
+
+@mcp.tool()
+def forge_toolchains() -> dict:
+    """Detect installed Flutter, Godot, Unity, Gradle and Android debug bridge tools."""
+    return discover_toolchains()
+
+
+@mcp.tool()
+def forge_build_mobile(relative_path: str, target: str, root: str | None = None,
+                       timeout_seconds: int = 1800) -> dict:
+    """Build a supported local Android project to APK/AAB or invoke Godot/Unity Android export."""
+    return build_project(_root(root), relative_path, target, timeout_seconds)
+
+
+@mcp.tool()
+def forge_prepare_play_store(relative_path: str, app_name: str, package_id: str,
+                             short_description: str, full_description: str,
+                             privacy_policy_url: str = "", root: str | None = None) -> dict:
+    """Write Google Play listing metadata and a human-review checklist; never publishes."""
+    return play_store_package(_root(root), relative_path, app_name, package_id,
+                              short_description, full_description, privacy_policy_url)
+
+
+@mcp.tool()
+def forge_prepare_admob(relative_path: str, platform: str = "android",
+                        formats: list[str] | None = None, root: str | None = None) -> dict:
+    """Create an AdMob setup plan with test-mode placeholders; does not add live IDs."""
+    return create_admob_plan(_root(root), relative_path, platform, formats)
 
 
 @mcp.tool()
