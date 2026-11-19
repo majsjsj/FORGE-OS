@@ -18,9 +18,15 @@ def create_plan(brief: str, project_type: str = "auto") -> dict:
         raise ValueError("Provide a project brief of at least 8 characters.")
     if project_type == "auto":
         lowered = clean.lower()
-        if any(x in lowered for x in ("android", "apk", "mobile app")):
+        if "flutter" in lowered:
+            project_type = "flutter"
+        elif "godot" in lowered:
+            project_type = "godot"
+        elif "unity" in lowered:
+            project_type = "unity"
+        elif any(x in lowered for x in ("android", "apk", "mobile app")):
             project_type = "android"
-        elif any(x in lowered for x in ("game", "unity", "godot", "3d")):
+        elif any(x in lowered for x in ("game", "3d")):
             project_type = "game"
         elif any(x in lowered for x in ("api", "backend", "service")):
             project_type = "api"
