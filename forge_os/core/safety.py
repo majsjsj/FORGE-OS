@@ -20,7 +20,7 @@ def resolve_workspace(root: str | Path) -> Path:
 
 def safe_path(root: str | Path, relative_path: str, *, for_write: bool = False) -> Path:
     base = resolve_workspace(root)
-    if not relative_path or "\\x00" in relative_path:
+    if not relative_path or chr(0) in relative_path:
         raise WorkspaceError("A valid relative path is required.")
     supplied = Path(relative_path)
     if supplied.is_absolute():
