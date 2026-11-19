@@ -50,6 +50,12 @@ uv run pytest
 
 Scaffolding refuses to overwrite existing files.
 
+## Web game and browser IDE
+
+The first playable web-game project is **ECHO//ME**, a solo time-loop puzzle platformer. Open [the FORGE browser studio](studio/index.html) to edit its HTML/CSS/JavaScript with Monaco (the VS Code editor engine), run a sandboxed live preview, and switch between desktop and mobile preview sizes. The game files are in [workspace/web-game](workspace/web-game/), and the workflow is documented in [WEB-STUDIO.md](docs/WEB-STUDIO.md).
+
+For full repository editing in a browser, open [GitHub.dev](https://github.dev/majsjsj/FORGE-OS). The embedded Monaco editor saves drafts in your browser only; use GitHub.dev to commit changes. This browser IDE is an early local-preview tool, not yet a hosted cloud IDE or automated visual QA service.
+
 ## Free-first cloud Android builds
 
 A manual GitHub Actions workflow can build the demo Flutter project into an APK or AAB without installing Android Studio or Flutter on your phone. See [FREE-CLOUD-BUILD.md](docs/FREE-CLOUD-BUILD.md). Flutter is the first cloud target; Godot and Unity cloud exports are not enabled yet. No paid service or billing integration is configured.
