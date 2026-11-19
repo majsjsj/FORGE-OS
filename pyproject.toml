@@ -11,8 +11,10 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = ["mcp>=1.2.0,<2.0.0"]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.optional-dependencies]
 vision = ["Pillow>=10.0"]
 
 [project.scripts]
