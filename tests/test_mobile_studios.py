@@ -25,3 +25,12 @@ def test_admob_uses_placeholders(tmp_path):
     data = json.loads((tmp_path / "admob-plan.json").read_text())
     assert data["test_mode"] is True
     assert data["ad_unit_ids"]["banner"].startswith("REPLACE_WITH_")
+
+
+
+def test_native_build_requires_explicit_approval(tmp_path):
+    from forge_os.studios.mobile import build_project
+
+    result = build_project(str(tmp_path), ".", "apk")
+    assert result["approval_required"] is True
+    assert result["ok"] is False
