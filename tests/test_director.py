@@ -9,3 +9,11 @@ def test_director_routes_android():
 
 def test_director_routes_games():
     assert detect_studio("Create a 3D game") == "game"
+
+
+def test_director_routes_engine_specific_studios():
+    from forge_os.core.director import direct
+
+    assert direct("Build a Flutter application", "flutter")["studio"] == "flutter"
+    assert direct("Build a Godot game", "godot")["studio"] == "godot"
+    assert direct("Build a Unity game", "unity")["studio"] == "unity"
