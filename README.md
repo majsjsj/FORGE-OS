@@ -2,11 +2,14 @@
 
 **FORGE-OS** is a model-agnostic engineering workspace. It is designed to work with Claude through MCP, or with a locally hosted model through the FORGE AI gateway.
 
-## Current release: 0.2.0
+## Current release: 0.3.0
 
 Implemented foundation:
 - FORGE Director: deterministic project classification, task breakdown, and specialist-agent routing (planning only).
-- Studios: starter scaffolds for web, Android, browser games, SaaS, and APIs.
+- Studios: starter scaffolds for web, native Android, Flutter, browser games, Unity, Godot, SaaS, and APIs.
+- Mobile/game pipeline: local toolchain detection and guarded APK/AAB build adapters for Gradle/Flutter, plus Unity/Godot Android export entry points.
+- Google Play preparation: listing metadata and a human-review release checklist.
+- AdMob planning: platform-specific setup plans with test-mode placeholders; no live ad IDs or automatic publishing.
 - FORGE Vision: image metadata and basic screenshot pixel-difference comparison (optional Pillow).
 - Repair engine: bounded verification/repair-loop primitive with caller-supplied callbacks.
 - FORGE AI gateway: OpenAI-compatible endpoint adapter for local models; Claude is not required for this gateway.
@@ -29,6 +32,14 @@ uv sync --extra vision
 uv run forge direct "Build an Android habit tracker"
 uv run forge scaffold web ./my-web-app
 uv run forge scaffold android ./my-android-app
+uv run forge scaffold flutter ./my-flutter-app
+uv run forge scaffold godot ./my-godot-game
+uv run forge scaffold unity ./my-unity-game
+uv run forge toolchains
+uv run forge build ./my-flutter-app apk
+uv run forge build ./my-flutter-app aab
+uv run forge play-package ./my-flutter-app --name 'My App' --package-id com.example.myapp --short 'A useful app' --description 'Full app description'
+uv run forge ads ./my-flutter-app --platform flutter --formats banner,interstitial,rewarded
 uv run forge scaffold game ./my-game
 uv run forge scaffold saas ./my-saas
 uv run forge scaffold api ./my-api
@@ -51,4 +62,4 @@ The stdio MCP server exposes project inspection, safe file operations, planning/
 
 This release is a functional foundation, not a fully autonomous software factory. Director routing does not yet execute independent agents. Studio templates are starters, not production apps. Vision currently performs pixel-level comparison, not semantic image understanding or automatic image-to-UI conversion. The repair loop needs an external trusted repair callback. The model gateway connects to an existing model; it does not train FORGE weights.
 
-See [architecture](docs/ARCHITECTURE.md), [studios](docs/STUDIOS.md), [vision and repair](docs/VISION-AND-REPAIR.md), and [roadmap](docs/ROADMAP.md).
+See [mobile and game pipeline](docs/MOBILE-GAME-PIPELINE.md), [architecture](docs/ARCHITECTURE.md), [studios](docs/STUDIOS.md), [vision and repair](docs/VISION-AND-REPAIR.md), and [roadmap](docs/ROADMAP.md).
