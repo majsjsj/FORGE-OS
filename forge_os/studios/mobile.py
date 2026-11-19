@@ -43,13 +43,15 @@ def _run(args: list[str], cwd: Path, timeout: int) -> dict:
         return {"ok": False, "error": str(exc), "command": args}
 
 
-def build_project(root: str, relative_path: str, target: str, timeout: int = 1800) -> dict:
+def build_project(root: str, relative_path: str, target: str, timeout: int = 1800, approved: bool = False) -> dict:
     """Build known project types. Outputs remain inside the selected project."""
     if not 1 <= timeout <= 3600:
         raise ValueError("timeout must be between 1 and 3600 seconds")
     project = safe_path(root, relative_path)
     if not project.is_dir():
         raise NotADirectoryError(str(project))
+    if not approved:
+        return {"ok": False, "approval_required": True, "message": "Review project build scripts, then call with approved=True to authorize native build execution.", "target": target}
     if target not in {"apk", "aab", "godot-android-debug", "unity-android"}:
         raise ValueError("Unsupported build target")
     if target in {"apk", "aab"}:
@@ -85,7 +87,26 @@ def build_project(root: str, relative_path: str, target: str, timeout: int = 180
         args = [exe, "-batchmode", "-quit", "-projectPath", str(project),
                 "-buildTarget", "Android", "-executeMethod", "BuildScript.BuildAndroid",
                 "-logFile", "-"]
-    return _run(args, project, timeout)
+    result = _run(args, project, timeout)
+    if not result.get("ok"):
+        return result
+    if target == "apk":
+        candidates = ([project / "build/app/outputs/flutter-apk/app-release.apk"]
+                      if (project / "pubspec.yaml").is_file()
+                      else list(project.glob("**/build/outputs/apk/release/*.apk")))
+    elif target == "aab":
+        candidates = ([project / "build/app/outputs/bundle/release/app-release.aab"]
+                      if (project / "pubspec.yaml").is_file()
+                      else list(project.glob("**/build/outputs/bundle/release/*.aab")))
+    elif target == "godot-android-debug":
+        candidates = [project / "build/android-debug.apk"]
+    else:
+        candidates = [project / "build/forge-android.apk"]
+    artifact = next((p for p in candidates if p.is_file() and p.stat().st_size > 0), None)
+    if artifact is None:
+        return {**result, "ok": False, "error": "Build returned success but no non-empty expected artifact was found.",
+                "checked_paths": [str(p) for p in candidates[:20]]}
+    return {**result, "artifact": str(artifact), "artifact_bytes": artifact.stat().st_size}
 
 
 def play_store_package(root: str, relative_path: str, app_name: str,
