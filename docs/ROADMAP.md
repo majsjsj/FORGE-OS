@@ -14,14 +14,19 @@
 - [ ] Agent execution runtime, budgets, approvals, and tool permission policies
 - [ ] Local model integration tests and benchmark suite
 
-## Phase 2 — Build studios (starter scaffolds delivered)
+## Phase 2 — Build studios (starter scaffolds and local build adapters delivered)
 - [x] Web starter scaffold
 - [x] Android Gradle starter scaffold
 - [x] Browser game starter scaffold
 - [x] SaaS/API FastAPI starter scaffolds
 - [ ] Web framework/build/test adapters and preview workflow
-- [ ] Android SDK build, emulator tests, APK/AAB packaging
-- [ ] Godot/Unity project adapters and gameplay test automation
+- [x] Flutter, Unity and Godot starter project scaffolds
+- [x] Local toolchain detection and guarded APK/AAB build adapters
+- [ ] Android SDK emulator tests, signing and release artifact verification
+- [x] Initial Godot/Unity Android export entry points
+- [ ] Full Godot export preset automation, Unity project settings and gameplay test automation
+- [x] Google Play listing metadata and release checklist generator (manual publishing)
+- [x] AdMob integration planning with test placeholders (SDK integration remains engine/version-specific)
 - [ ] Production SaaS auth, tenant isolation, database, billing, and deployment workflows
 
 ## Phase 3 — FORGE Vision (partial)
