@@ -33,3 +33,11 @@ You are the project director. Use the FORGE-OS MCP tools when they are available
 
 ## Chat/mobile limitation
 The checked-in `.mcp.json` uses local stdio and is intended for Claude Code in an environment that can run the repository. It does not itself create a hosted MCP endpoint or make this repository controllable from Claude mobile. Never claim phone-only remote control is ready until a hosted authenticated MCP transport and its connection flow have been deployed and verified.
+
+## Web game and UI/UX workflow
+- For browser games, prefer a dependency-light HTML/CSS/JavaScript project that runs on desktop and mobile browsers before introducing a game engine.
+- Use the FORGE browser studio at `studio/index.html`: Monaco is the VS Code editor engine, the preview runs in a sandboxed iframe, and local drafts remain in the user's browser. Do not claim edits are committed to GitHub unless a GitHub write action confirms it.
+- Open the repo in GitHub's browser editor at `https://github.dev/majsjsj/FORGE-OS` when repository commits are needed. This is GitHub.dev, not a self-hosted full VS Code server.
+- After every implementation, run JavaScript syntax checks and relevant automated tests where the environment permits; inspect the actual preview at desktop and mobile sizes before claiming visual QA.
+- Apply senior UI/UX practice: clear visual hierarchy, consistent spacing/type/color tokens, responsive layouts, readable contrast, visible focus states, keyboard and touch input, feedback for actions, and accessible labels. Explain any visual checks that could not be performed.
+- Keep the playable game independent from the editor. Never use `eval` to run project code; the preview iframe must remain sandboxed.
