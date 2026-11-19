@@ -45,3 +45,18 @@ FORGE does not bundle Unity, Godot, Flutter, Android SDK, JDK or emulator images
 It detects tools and invokes installed local toolchains. Google Play publishing
 and AdMob account operations remain manual and require your credentials and
 human review.
+
+
+## Native build approval and artifact verification
+
+MCP calls to `forge_build_mobile` are deliberately non-executing by default.
+First inspect the project and its build scripts, then call the tool again with
+`approved=true` only after the user explicitly authorizes running those scripts.
+The tool uses fixed argument arrays (never a shell) and checks that a non-empty
+APK/AAB exists at the expected output location before reporting success. A
+successful process exit without an artifact is treated as a failed build.
+
+This approval flag is an explicit per-call authorization gate, not an OS sandbox.
+Do not build untrusted repositories on a machine containing secrets or signing
+keys; use an isolated runner/container. FORGE does not sign, upload, or publish
+the artifact automatically.
