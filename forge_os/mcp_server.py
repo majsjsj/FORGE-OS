@@ -1,14 +1,16 @@
 """MCP stdio server for Claude and other MCP clients; tools also serve other MCP hosts."""
 import os
+
 from mcp.server.fastmcp import FastMCP
-from forge_os.core.planner import create_plan
+
 from forge_os.core.director import direct
+from forge_os.core.planner import create_plan
 from forge_os.core.safety import resolve_workspace
 from forge_os.engines.vision import compare_images, image_info
 from forge_os.models.gateway import chat, model_status
-from forge_os.studios.scaffold import scaffold
-from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
 from forge_os.studios.ads import create_admob_plan
+from forge_os.studios.mobile import build_project, discover_toolchains, play_store_package
+from forge_os.studios.scaffold import scaffold
 from forge_os.tools.project import inspect_project, list_files, read_file, run_python_tests, write_file
 
 mcp = FastMCP("FORGE-OS")
