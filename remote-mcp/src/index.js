@@ -17,6 +17,33 @@ function rpcError(id, code, message) {
   return json({ jsonrpc: "2.0", id, error: { code, message } }, 400);
 }
 
+function validateWorkspacePath(path, allowDirectory = false) {
+  if (typeof path !== "string" || !/^workspace(?:\\/[A-Za-z0-9._-]+)*$/.test(path) ||
+      path.includes("..") || (!allowDirectory && path === "workspace")) {
+    throw new Error("Path must be workspace/ or a safe child path inside workspace/.");
+  }
+  const blocked = path.split("/").some(part =>
+    part === ".git" || part === ".github" || part === ".claude" ||
+    /^\\.env($|\\.)/i.test(part) || /\\.(pem|key|p12|pfx|jks|keystore)$/i.test(part) ||
+    /(^|\\.)(secrets?|credentials?)(\\.|$)/i.test(part));
+  if (blocked) throw new Error("This path is blocked because it may contain credentials or repository control files.");
+  return path;
+}
+
+function decodeBase64Utf8(value) {
+  const binary = atob(value.replace(/\\n/g, ""));
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeBase64Utf8(value) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
 function authorized(request, env) {
   const expected = env.FORGE_ACCESS_TOKEN;
   const header = request.headers.get("authorization") || "";
@@ -49,6 +76,31 @@ async function github(env, path, options = {}) {
 }
 
 const TOOLS = [
+  {
+    name: "forge_workspace_list",
+    description: "List files and folders inside workspace/ in the connected FORGE repository.",
+    inputSchema: { type: "object", properties: { path: { type: "string", description: "workspace/ or a subfolder under it." } }, required: ["path"], additionalProperties: false },
+  },
+  {
+    name: "forge_workspace_read",
+    description: "Read a UTF-8 project file committed in workspace/. Returns its blob SHA for safe updates.",
+    inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
+  },
+  {
+    name: "forge_workspace_write",
+    description: "Create or update a UTF-8 project file in workspace/ as a Git commit. Requires confirm=true after the user asks you to create or edit project files. For updates, pass the SHA returned by forge_workspace_read.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        content: { type: "string" },
+        expected_sha: { type: "string", description: "Required when updating an existing file; omit only when creating a new file." },
+        confirm: { type: "boolean" },
+      },
+      required: ["path", "content", "confirm"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
@@ -97,6 +149,36 @@ const TOOLS = [
 ];
 
 async function callTool(name, args, env) {
+  if (name === "forge_workspace_list") {
+    const path = validateWorkspacePath(args.path, true);
+    const entries = await github(env, `contents/${path}`);
+    if (!Array.isArray(entries)) throw new Error("The requested path is not a directory.");
+    return entries.filter(entry => ![".git", ".github", ".claude"].includes(entry.name))
+      .map(entry => ({ name: entry.name, path: entry.path, type: entry.type, size: entry.size, sha: entry.sha }));
+  }
+
+  if (name === "forge_workspace_read") {
+    const path = validateWorkspacePath(args.path);
+    const file = await github(env, `contents/${path}`);
+    if (Array.isArray(file) || !file.content || file.encoding !== "base64")
+      throw new Error("The requested path is not a readable text file.");
+    return { path: file.path, sha: file.sha, content: decodeBase64Utf8(file.content) };
+  }
+
+  if (name === "forge_workspace_write") {
+    const path = validateWorkspacePath(args.path);
+    if (args.confirm !== true) throw new Error("Write not performed: confirm=true is required after the user asks to create or edit project files.");
+    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 500000)
+      throw new Error("File content must be UTF-8 text no larger than 500 KB.");
+    if (args.expected_sha !== undefined && (typeof args.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(args.expected_sha)))
+      throw new Error("expected_sha must be a valid Git blob SHA.");
+    const payload = { message: `FORGE: update ${path}`, content: encodeBase64Utf8(args.content) };
+    if (args.expected_sha) payload.sha = args.expected_sha;
+    const saved = await github(env, `contents/${path}`, { method: "PUT", body: JSON.stringify(payload) });
+    return { saved: true, path: saved.content.path, sha: saved.content.sha,
+      commit_sha: saved.commit.sha, html_url: saved.content.html_url };
+  }
+
   if (name === "forge_health") {
     return { ok: true, service: "FORGE Remote Controller", repository: REPO, workflow: WORKFLOW,
       github_token_configured: Boolean(env.GITHUB_TOKEN), build_execution: "on-demand only" };
