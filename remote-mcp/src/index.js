@@ -138,6 +138,11 @@ const TOOLS = [
     },
   },
   {
+    name: "forge_artifact_download",
+    description: "Create a temporary download URL for a ZIP artifact produced by a FORGE on-demand workflow run. The URL expires and the ZIP may contain the APK/AAB or web build.",
+    inputSchema: { type: "object", properties: { artifact_id: { type: "integer" } }, required: ["artifact_id"], additionalProperties: false },
+  },
+  {
     name: "forge_build_logs",
     description: "Read the tail of logs for one job belonging to the specified FORGE build run.",
     inputSchema: {
@@ -232,6 +237,29 @@ async function callTool(name, args, env) {
       artifacts: (artifacts.artifacts || []).map(a => ({ id: a.id, name: a.name,
         size_in_bytes: a.size_in_bytes, expired: a.expired, expires_at: a.expires_at })),
     };
+  }
+
+  if (name === "forge_artifact_download") {
+    const artifactId = Number(args.artifact_id);
+    if (!Number.isSafeInteger(artifactId) || artifactId <= 0) throw new Error("Invalid artifact_id.");
+    const artifact = await github(env, `actions/artifacts/${artifactId}`);
+    if (artifact.expired) throw new Error("This artifact has expired.");
+    const runId = artifact.workflow_run?.id;
+    if (!runId) throw new Error("Artifact is not associated with a workflow run.");
+    const run = await github(env, `actions/runs/${runId}`);
+    if (run.path !== `.github/workflows/${WORKFLOW}`)
+      throw new Error("This artifact was not produced by the FORGE on-demand workflow.");
+    const response = await fetch(`https://api.github.com/repos/${REPO}/actions/artifacts/${artifactId}/zip`, {
+      redirect: "manual",
+      headers: { "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28" },
+    });
+    if (response.status !== 302) throw new Error(`GitHub artifact download did not return a redirect (HTTP ${response.status}).`);
+    const downloadUrl = response.headers.get("location");
+    if (!downloadUrl || !downloadUrl.startsWith("https://")) throw new Error("GitHub did not provide a valid temporary download URL.");
+    return { artifact_id: artifactId, name: artifact.name, download_url: downloadUrl,
+      expires_at: artifact.expires_at, format: "zip",
+      note: "Temporary signed GitHub download URL. Download and extract the ZIP to access the build output." };
   }
 
   if (name === "forge_build_logs") {
