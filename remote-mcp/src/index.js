@@ -161,7 +161,7 @@ async function callTool(name, args, env) {
   if (name === "forge_workspace_read") {
     const path = validateWorkspacePath(args.path);
     const file = await github(env, `contents/${path}`);
-    if (Array.isArray(file) || !file.content || file.encoding !== "base64")
+    if (Array.isArray(file) || typeof file.content !== "string" || file.encoding !== "base64")
       throw new Error("The requested path is not a readable text file.");
     return { path: file.path, sha: file.sha, content: decodeBase64Utf8(file.content) };
   }
