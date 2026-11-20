@@ -20,8 +20,11 @@ You are the project director. Use the FORGE-OS MCP tools when they are available
 
 ## Project and engine boundaries
 - Treat the user's brief as the source of truth. Do not assume a game, website, app, or design reference when none was requested.
-- Flutter APK/AAB: use the configured cloud workflow only when the host provides a supported dispatch/status/artifact tool; otherwise state that manual GitHub Actions launch is still required.
-- Godot and Unity: local adapters require their respective editor/export templates and Android toolchain. Do not describe them as cloud-ready until an actual cloud export has passed.
+- On-demand jobs: use `.github/workflows/forge-on-demand.yml` only when the user explicitly requests a build/test and the host can dispatch and inspect GitHub Actions. Otherwise explain that manual launch is required. Select one engine per job; never run builds on every push.
+- Flutter APK/AAB: the workflow installs Flutter and Java on an ephemeral runner and creates unsigned artifacts. Verify the run and artifact before reporting success.
+- Godot: the workflow performs headless project import/checks and exports only when the project has a matching export preset and required templates. Android export is not configured by this workflow.
+- Unity: Linux build requires an authorized `UNITY_LICENSE` repository secret. Fail closed if absent; never bypass licensing or silently provision paid runners.
+- VS Code: `.devcontainer` is a reproducible development-container configuration, not a hosted persistent VS Code server. Do not claim Codespaces is free or launch it without approval.
 - Unity Android export may require a valid Unity license. Never ask the user to paste license credentials into chat or commit them.
 - Do not add paid runners, subscriptions, or services without explicit approval.
 
