@@ -1,36 +1,33 @@
-# FORGE Web Studio
+# FORGE Universal Web Studio
 
-The first browser-game project is **ECHO//ME**, a solo time-loop puzzle platformer.
+FORGE Studio is a project-agnostic browser workspace. It does not ship with a sample game, demo app, or reference project.
 
-## Try the game
-Open `workspace/web-game/index.html` in a static web server or use the FORGE Studio preview. The game is plain HTML, CSS, and JavaScript and needs no Unity, Godot, Flutter, or local game-engine install.
+## Clean starter workspace
 
-Controls:
-- A / D or arrow keys: move
-- Space / W / Up: jump
-- E: record and replay the current timeline as an echo
-- R: restart
-- Touch buttons are available on narrow screens
+The editor opens three intentionally minimal files from `workspace/blank-project/`:
+- `index.html`
+- `styles.css`
+- `script.js`
 
-The core puzzle is to record a past run that stands on the floor switch, then move as the present player while the echo replays and opens the exit.
+These are blank starter files, not a finished project. An AI agent can create additional files, directories, and project structure according to the user's request.
 
-## Browser code editor
-Open `studio/index.html`. It loads the Monaco editor (the editor engine used by VS Code) from a public CDN, exposes the game's HTML/CSS/JS files, and runs the current contents in a sandboxed iframe. Desktop/mobile preview sizing is included.
+## Browser editor
+
+Open `studio/index.html`. It loads Monaco (the editor engine used by VS Code) from a public CDN, provides HTML/CSS/JavaScript editing, a sandboxed live preview, and desktop/mobile viewport sizing.
 
 - Drafts are saved in browser localStorage only.
-- The preview is local to the page; it does not execute code on a server.
-- Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) to edit and commit repository files in the browser.
-- GitHub.dev is GitHub's browser editor, not a hosted VS Code server managed by FORGE.
-- Monaco requires internet access to load its CDN assets; a plain-text fallback is shown if it cannot load.
+- Preview runs in a sandboxed iframe in the browser; it is not a remote execution environment.
+- The editor does not yet commit changes to GitHub automatically. Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) to edit and commit repository files.
+- Monaco requires internet access; a basic text editor fallback is provided.
+
+## AI operation
+
+The repository also contains the FORGE agent skills, MCP server, project tools, planning, build, and QA components. The browser editor is currently a standalone front end; connecting its editing session directly to the agent requires the chat/MCP integration described in the architecture docs.
 
 ## Current limits
-This is an early prototype, not a production game or a complete cloud IDE. The editor does not yet commit files, run a full browser automation suite, or provide remote multiplayer. Visual QA still needs a human pass on real desktop and mobile browsers.
+
+This is an evolving development environment, not a complete hosted VS Code instance. The local preview does not provide arbitrary server processes, native mobile emulators, or full Unity/Godot/Flutter runtimes. Cloud build workflows are separate and must be explicitly triggered where applicable.
 
 ## Publish on GitHub Pages
 
-The `.github/workflows/deploy-web-studio.yml` workflow publishes the landing page, editor, and game for free on GitHub Pages whenever these web files change. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** once in the repository. After the first successful deployment, the public URLs are:
-- `https://majsjsj.github.io/FORGE-OS/` — web lab landing page
-- `https://majsjsj.github.io/FORGE-OS/studio/` — code editor and live preview
-- `https://majsjsj.github.io/FORGE-OS/workspace/web-game/` — game
-
-The deployment URL is not considered live until the Pages workflow succeeds.
+The workflow publishes the landing page, editor, and blank starter workspace on GitHub Pages. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** in the repository. The deployment is considered live only after the Pages workflow succeeds.
