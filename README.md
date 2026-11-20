@@ -56,9 +56,9 @@ Open [FORGE Studio](studio/index.html). It starts with a clean, empty HTML/CSS/J
 
 The browser editor uses Monaco (the VS Code editor engine), a sandboxed local preview, and desktop/mobile viewport sizing. Drafts are stored in browser localStorage. Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) for repository editing and commits; the embedded Monaco editor does not commit automatically.
 
-## Free-first cloud Android builds
+## On-demand development environments
 
-A manual GitHub Actions workflow can build the demo Flutter project into an APK or AAB without installing Android Studio or Flutter on your phone. See [FREE-CLOUD-BUILD.md](docs/FREE-CLOUD-BUILD.md). Flutter is the first cloud target; Godot and Unity cloud exports are not enabled yet. No paid service or billing integration is configured.
+See [on-demand environments](docs/ON-DEMAND-ENVIRONMENTS.md). The repository now includes a reproducible VS Code Dev Container definition and a manual-only GitHub Actions workflow for Web, Flutter, Godot headless checks/exports, and Unity Linux builds gated by a `UNITY_LICENSE` secret. Jobs use temporary GitHub-hosted runners, short timeouts, and short artifact retention; they do not run on every push. Godot export requires matching project presets; Android export is not yet enabled here. Unity requires an authorized license. No paid service is activated automatically. GitHub Actions and Codespaces quotas/billing remain account-dependent.
 
 ## Run your own model (no Claude required)
 
@@ -66,7 +66,7 @@ See [FORGE AI setup](docs/FORGE-AI.md). Configure `FORGE_MODEL_BASE_URL` and `FO
 
 ## Chat-operated studio roadmap
 
-See [chat-operated studio architecture](docs/CHAT-OPERATED-STUDIO.md) for the required remote MCP control plane, isolated cloud builds, per-user encrypted secret vault, approval gates, and verified engine delivery gates. The `forge-studio` Claude Code skill defines safe project execution and honest capability reporting. Phone-only remote control is not deployed yet: the current MCP configuration is local stdio, and the Flutter workflow still requires a manual GitHub Actions launch.
+See [chat-operated studio architecture](docs/CHAT-OPERATED-STUDIO.md) for the required remote MCP control plane, isolated cloud builds, per-user encrypted secret vault, approval gates, and verified engine delivery gates. The `forge-studio` Claude Code skill defines safe project execution and honest capability reporting. Phone-only remote control is not deployed yet: the current MCP configuration is local stdio, and engine jobs are manually launched from GitHub Actions. A hosted authenticated MCP dispatcher and tenant-isolated secret vault remain future work.
 
 ## MCP tools
 
