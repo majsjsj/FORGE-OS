@@ -5,7 +5,7 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 
 ## Current verified boundary
 - The repository includes a local stdio MCP server and Claude Code configuration.
-- The current cloud Android workflow is manually started from GitHub Actions and builds Flutter only.
+- The on-demand GitHub Actions workflow supports Web checks, Flutter analyze/test plus unsigned APK/AAB builds, Godot headless import and configured Web/Linux exports, and Unity Linux builds gated by a license secret.
 - The mobile adapters can invoke Flutter, Gradle, Godot, and Unity when those toolchains are installed in the execution environment.
 - A project template or local adapter is not evidence of a successful cloud build.
 - The repository now contains a deployable single-owner Cloudflare Worker remote MCP controller and a manual deployment workflow. It is not live until the owner adds Cloudflare/GitHub repository secrets and runs that deployment workflow.
@@ -14,10 +14,10 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 ## Required architecture
 
 ### 1. Conversational control plane
-A hosted MCP service must expose authenticated project operations, build dispatch, build status, logs, and artifact retrieval. It must use a supported remote MCP transport and an explicit user-to-tenant identity mapping. The current `.mcp.json` stdio entry remains useful for Claude Code, but is not a mobile remote connection.
+The first implementation is a single-owner Cloudflare Worker using stateless Streamable HTTP and a bearer token. It exposes workspace text-file operations, build dispatch, build status, logs, artifact metadata, and temporary signed ZIP download URLs. The owner must deploy it and connect it as a Claude custom connector; the local `.mcp.json` stdio entry remains useful for Claude Code. Multi-user OAuth and tenant identity mapping are not implemented.
 
 ### 2. Build plane
-Build jobs run in isolated, short-lived workers. Each job receives only the selected project snapshot and the minimum required secret handles. It returns a build ID, structured logs, test results, and verified artifacts. Flutter is the first cloud engine. Godot must pass a real Android export test before being advertised as cloud-supported. Unity must additionally pass license activation and Android build tests without enabling paid infrastructure by default.
+Build jobs run in short-lived GitHub-hosted runners and check out committed project files from the repository's main branch. They return a run ID, logs, test summaries, and short-lived artifacts. The controller does not yet upload uncommitted browser drafts or create isolated per-project snapshots. Godot Android export is not enabled. Unity currently targets Linux and requires a valid license secret. Flutter APK/AAB builds are unsigned.
 
 ### 3. Tenant isolation and secret vault
 Every user and project must have an authenticated tenant ID. Secret reads and writes must be authorized server-side for that tenant and project. Encrypt secrets at rest using a managed key or envelope-encryption design; redact values from logs; pass secrets to jobs only at runtime. Do not put credentials in Git, project prompts, ordinary chat, workflow artifacts, or public issue threads.
