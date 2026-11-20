@@ -48,10 +48,6 @@ async function github(env, path, options = {}) {
   return response.json();
 }
 
-function toolResult(value) {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
-}
-
 const TOOLS = [
   {
     name: "forge_health",
@@ -180,8 +176,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/health" && request.method === "GET")
       return json({ ok: true, service: "FORGE Remote Controller" });
-    if (url.pathname !== "/mcp" || request.method !== "POST")
-      return json({ error: "Use authenticated POST /mcp or GET /health." }, 404);
+    if (url.pathname === "/mcp" && request.method !== "POST")
+      return json({ error: "MCP endpoint accepts POST requests only." }, 405);
+    if (url.pathname !== "/mcp")
+      return json({ error: "Not found." }, 404);
 
     let message;
     try { message = await request.json(); }
