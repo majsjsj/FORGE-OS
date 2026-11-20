@@ -18,20 +18,20 @@ function rpcError(id, code, message) {
 }
 
 function validateWorkspacePath(path, allowDirectory = false) {
-  if (typeof path !== "string" || !/^workspace(?:\\/[A-Za-z0-9._-]+)*$/.test(path) ||
+  if (typeof path !== "string" || !/^workspace(?:\/[A-Za-z0-9._-]+)*$/.test(path) ||
       path.includes("..") || (!allowDirectory && path === "workspace")) {
-    throw new Error("Path must be workspace/ or a safe child path inside workspace/.");
+    throw new Error("Path must be workspace or a safe child path inside workspace.");
   }
   const blocked = path.split("/").some(part =>
     part === ".git" || part === ".github" || part === ".claude" ||
-    /^\\.env($|\\.)/i.test(part) || /\\.(pem|key|p12|pfx|jks|keystore)$/i.test(part) ||
-    /(^|\\.)(secrets?|credentials?)(\\.|$)/i.test(part));
+    /^\.env($|\.)/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore)$/i.test(part) ||
+    /(^|\.)(secrets?|credentials?)(\.|$)/i.test(part));
   if (blocked) throw new Error("This path is blocked because it may contain credentials or repository control files.");
   return path;
 }
 
 function decodeBase64Utf8(value) {
-  const binary = atob(value.replace(/\\n/g, ""));
+  const binary = atob(value.replace(/\n/g, ""));
   const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
 }
