@@ -62,6 +62,7 @@ async function github(env, path, options = {}) {
     ...options,
     headers: {
       "accept": "application/vnd.github+json",
+      "user-agent": "FORGE-OS-Remote-Controller/1.0",
       "authorization": `Bearer ${env.GITHUB_TOKEN}`,
       "x-github-api-version": "2022-11-28",
       "content-type": "application/json",
@@ -251,7 +252,7 @@ async function callTool(name, args, env) {
       throw new Error("This artifact was not produced by the FORGE on-demand workflow.");
     const response = await fetch(`https://api.github.com/repos/${REPO}/actions/artifacts/${artifactId}/zip`, {
       redirect: "manual",
-      headers: { "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
+      headers: { "user-agent": "FORGE-OS-Remote-Controller/1.0", "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
         "x-github-api-version": "2022-11-28" },
     });
     if (response.status !== 302) throw new Error(`GitHub artifact download did not return a redirect (HTTP ${response.status}).`);
@@ -269,7 +270,7 @@ async function callTool(name, args, env) {
     const jobs = await github(env, `actions/runs/${runId}/jobs?per_page=100`);
     if (!(jobs.jobs || []).some(j => j.id === jobId)) throw new Error("job_id does not belong to this run.");
     const response = await fetch(`https://api.github.com/repos/${REPO}/actions/jobs/${jobId}/logs`, {
-      headers: { "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
+      headers: { "user-agent": "FORGE-OS-Remote-Controller/1.0", "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
         "x-github-api-version": "2022-11-28" },
     });
     if (!response.ok) throw new Error(`GitHub logs API ${response.status}.`);
