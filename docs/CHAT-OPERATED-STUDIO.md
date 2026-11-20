@@ -8,7 +8,8 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 - The current cloud Android workflow is manually started from GitHub Actions and builds Flutter only.
 - The mobile adapters can invoke Flutter, Gradle, Godot, and Unity when those toolchains are installed in the execution environment.
 - A project template or local adapter is not evidence of a successful cloud build.
-- This repository does not yet contain a hosted MCP endpoint, remote workflow dispatcher, authenticated multi-user workspace service, or per-user secrets vault.
+- The repository now contains a deployable single-owner Cloudflare Worker remote MCP controller and a manual deployment workflow. It is not live until the owner adds Cloudflare/GitHub repository secrets and runs that deployment workflow.
+- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, and inspect runs. It is not a multi-user workspace service and has no per-user secrets vault.
 
 ## Required architecture
 
