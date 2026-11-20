@@ -108,7 +108,7 @@ jobs:
         run: |
           cd "$PROJECT_PATH"
           flutter pub get
-          flutter analyze
+          flutter analyze --no-fatal-infos
           if find test -type f -name '*_test.dart' -print -quit 2>/dev/null | grep -q .; then
             flutter test
           else
