@@ -24,8 +24,9 @@ function validateWorkspacePath(path, allowDirectory = false) {
   }
   const blocked = path.split("/").some(part =>
     part === ".git" || part === ".github" || part === ".claude" ||
-    /^\.env($|\.)/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore)$/i.test(part) ||
-    /(^|\.)(secrets?|credentials?)(\.|$)/i.test(part));
+    [".npmrc", ".pypirc", "key.properties", "keystore.properties", "id_rsa", "id_ed25519"].includes(part.toLowerCase()) ||
+    /^\.env($|\.)/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part) ||
+    /(^|\.)(secrets?|credentials?)(\.|$)/i.test(part) || /^service-account.*\.json$/i.test(part));
   if (blocked) throw new Error("This path is blocked because it may contain credentials or repository control files.");
   return path;
 }
