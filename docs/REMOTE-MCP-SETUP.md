@@ -8,7 +8,7 @@ This is the first remote-control layer for FORGE-OS. It is a stateless Streamabl
 - Health check.
 - Read/list/create/update text files inside `workspace/` through GitHub Contents API commits.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
-- Latest build status, job/step summaries, artifact metadata, and bounded job-log retrieval.
+- Latest build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
 - Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
 - GitHub token and access token are runtime secrets, never repository files.
 
@@ -53,6 +53,7 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 - The controller does not yet sync uncommitted browser-editor drafts or create isolated branches per project.
 - Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
 - Poll `forge_latest_build` or inspect `forge_build_details`; retrieve logs with `forge_build_logs` if needed.
+- Use `forge_artifact_download` with an artifact ID from build details to obtain a temporary ZIP download link. Download links expire; artifacts are retained for only three days.
 - A dispatch response means GitHub accepted the request, **not** that the build passed.
 - Unity currently supports only Linux output and still requires the repository's `UNITY_LICENSE` secret. Godot cloud Android export is not enabled. Flutter APK/AAB output is unsigned.
 - GitHub Actions quotas apply. The controller never switches to paid runners.
