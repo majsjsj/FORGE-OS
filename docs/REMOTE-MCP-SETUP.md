@@ -6,9 +6,10 @@ This is the first remote-control layer for FORGE-OS. It is a stateless Streamabl
 
 - Authenticated MCP endpoint at `/mcp` using a dedicated bearer token.
 - Health check.
+- Read/list/create/update text files inside `workspace/` through GitHub Contents API commits.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
 - Latest build status, job/step summaries, artifact metadata, and bounded job-log retrieval.
-- Strict engine/output allowlists and project paths restricted to `workspace/`.
+- Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
 - GitHub token and access token are runtime secrets, never repository files.
 
 This is a **single-owner controller**, not yet a multi-user service. Do not share its bearer token or connect untrusted users. It does not yet upload project files, create commits, download artifact bytes, sign apps, or provide a per-user secret vault.
@@ -22,7 +23,7 @@ Cloudflare account and free-plan limits apply; check current limits before use. 
    `cd remote-mcp && npm install`
 3. Create a fine-grained GitHub token scoped only to `majsjsj/FORGE-OS` with:
    - Actions: Read and write
-   - Contents: Read-only
+   - Contents: Read and write
    Do not grant administration, secrets, or unrelated repository access.
 4. Deploy the Worker:
    `npx wrangler login`
@@ -50,7 +51,8 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 ## Use safely
 
 - First call `forge_health`.
-- The project must already exist in the repository under `workspace/<project>`; the controller does not yet sync uncommitted browser-editor drafts.
+- Use `forge_workspace_list`, `forge_workspace_read`, and `forge_workspace_write` to create/edit files in `workspace/<project>`. Writes create commits on `main`; updates require the current blob SHA returned by read. Files must be text and no larger than 500 KB.
+- The controller does not yet sync uncommitted browser-editor drafts or create isolated branches per project.
 - Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
 - Poll `forge_latest_build` or inspect `forge_build_details`; retrieve logs with `forge_build_logs` if needed.
 - A dispatch response means GitHub accepted the request, **not** that the build passed.
@@ -60,4 +62,4 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 
 ## Protocol notes
 
-The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
+The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, branch isolation, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
