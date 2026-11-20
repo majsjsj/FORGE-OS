@@ -90,6 +90,17 @@ jobs:
           if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
           if not (Path.cwd()/p/"pubspec.yaml").is_file(): raise SystemExit("pubspec.yaml not found")
           PY
+      - name: Generate Android platform when missing
+        if: inputs.output == 'apk' || inputs.output == 'aab'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          if [ ! -d "$PROJECT_PATH/android" ]; then
+            PROJECT_NAME="$(sed -n 's/^name:[[:space:]]*//p' "$PROJECT_PATH/pubspec.yaml" | head -n1 | tr -d "\"'")"
+            if ! [[ "$PROJECT_NAME" =~ ^[a-z][a-z0-9_]*$ ]]; then PROJECT_NAME="forge_app"; fi
+            flutter create --platforms=android --org com.forgeos --project-name "$PROJECT_NAME" /tmp/forge-android-scaffold
+            cp -a /tmp/forge-android-scaffold/android "$PROJECT_PATH/android"
+          fi
       - name: Test and build
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
@@ -98,7 +109,11 @@ jobs:
           cd "$PROJECT_PATH"
           flutter pub get
           flutter analyze
-          flutter test
+          if find test -type f -name '*_test.dart' -print -quit 2>/dev/null | grep -q .; then
+            flutter test
+          else
+            echo "No Dart test files found; skipping flutter test."
+          fi
           if [ "$OUTPUT" = apk ]; then flutter build apk --release;
           elif [ "$OUTPUT" = aab ]; then flutter build appbundle --release;
           elif [ "$OUTPUT" != test ]; then echo "Flutter output must be test, apk, or aab"; exit 1; fi
