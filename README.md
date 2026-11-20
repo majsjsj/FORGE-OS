@@ -1,19 +1,19 @@
 # FORGE-OS
 
-**FORGE-OS** is a model-agnostic engineering workspace. It is designed to work with Claude through MCP, or with a locally hosted model through the FORGE AI gateway.
+**FORGE-OS** is a model-agnostic AI development workspace. It is designed to work with Claude through MCP, or with a separately hosted model through the FORGE AI gateway.
 
-## Current release: 0.3.0
+## Current foundation
 
-Implemented foundation:
 - FORGE Director: deterministic project classification, task breakdown, and specialist-agent routing (planning only).
-- Studios: starter scaffolds for web, native Android, Flutter, browser games, Unity, Godot, SaaS, and APIs.
-- Mobile/game pipeline: local toolchain detection and guarded APK/AAB build adapters for Gradle/Flutter, plus Unity/Godot Android export entry points.
+- Project studios and scaffolds for web, Android, Flutter, browser games, Unity, Godot, SaaS, and APIs.
+- A clean, project-agnostic browser workspace with Monaco editing, a sandboxed preview, and desktop/mobile viewport sizing.
+- Mobile build pipeline: local toolchain detection and guarded APK/AAB build adapters for Gradle/Flutter, plus Unity/Godot Android export entry points.
 - Google Play preparation: listing metadata and a human-review release checklist.
 - AdMob planning: platform-specific setup plans with test-mode placeholders; no live ad IDs or automatic publishing.
 - FORGE Vision: image metadata and basic screenshot pixel-difference comparison (optional Pillow).
 - Repair engine: bounded verification/repair-loop primitive with caller-supplied callbacks.
-- FORGE AI gateway: OpenAI-compatible endpoint adapter for local models; Claude is not required for this gateway.
-- MCP server, CLI, workspace-scoped file operations, initial tests, and Claude Code skills.
+- FORGE AI gateway: OpenAI-compatible endpoint adapter for local models.
+- MCP server, CLI, workspace-scoped file operations, tests, and Claude Code skills.
 
 ## Install
 
@@ -50,11 +50,11 @@ uv run pytest
 
 Scaffolding refuses to overwrite existing files.
 
-## Web game and browser IDE
+## Universal browser workspace
 
-The first playable web-game project is **ECHO//ME**, a solo time-loop puzzle platformer. Open [the FORGE browser studio](studio/index.html) to edit its HTML/CSS/JavaScript with Monaco (the VS Code editor engine), run a sandboxed live preview, and switch between desktop and mobile preview sizes. The game files are in [workspace/web-game](workspace/web-game/), and the workflow is documented in [WEB-STUDIO.md](docs/WEB-STUDIO.md).
+Open [FORGE Studio](studio/index.html). It starts with a clean, empty HTML/CSS/JavaScript workspace in `workspace/blank-project/`. There is no preloaded sample game or reference app. The AI can generate the project structure and files from the user's brief.
 
-For full repository editing in a browser, open [GitHub.dev](https://github.dev/majsjsj/FORGE-OS). The embedded Monaco editor saves drafts in your browser only; use GitHub.dev to commit changes. This browser IDE is an early local-preview tool, not yet a hosted cloud IDE or automated visual QA service.
+The browser editor uses Monaco (the VS Code editor engine), a sandboxed local preview, and desktop/mobile viewport sizing. Drafts are stored in browser localStorage. Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) for repository editing and commits; the embedded Monaco editor does not commit automatically.
 
 ## Free-first cloud Android builds
 
