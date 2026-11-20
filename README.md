@@ -64,9 +64,11 @@ See [on-demand environments](docs/ON-DEMAND-ENVIRONMENTS.md). The repository now
 
 See [FORGE AI setup](docs/FORGE-AI.md). Configure `FORGE_MODEL_BASE_URL` and `FORGE_MODEL_NAME` for an OpenAI-compatible endpoint such as a local Ollama server. FORGE does not yet ship its own trained foundation-model weights.
 
-## Chat-operated studio roadmap
+## Remote chat controller
 
-See [chat-operated studio architecture](docs/CHAT-OPERATED-STUDIO.md) for the required remote MCP control plane, isolated cloud builds, per-user encrypted secret vault, approval gates, and verified engine delivery gates. The `forge-studio` Claude Code skill defines safe project execution and honest capability reporting. Phone-only remote control is not deployed yet: the current MCP configuration is local stdio, and engine jobs are manually launched from GitHub Actions. A hosted authenticated MCP dispatcher and tenant-isolated secret vault remain future work.
+The repository now includes a deployable, authenticated stateless MCP Worker for Claude custom connectors. It can dispatch explicitly authorized on-demand GitHub Actions builds and inspect run status, jobs, artifacts, and logs. See [remote MCP setup](docs/REMOTE-MCP-SETUP.md). **It is source code only until you deploy it to your own Cloudflare account and add the two runtime secrets.** After deployment, add it as a custom connector in Claude web; the connected tools can then be enabled in Claude mobile. The current controller is single-owner and does not yet sync uncommitted browser drafts, download artifact bytes, or provide multi-user isolation and a per-user secret vault.
+
+See [chat-operated studio architecture](docs/CHAT-OPERATED-STUDIO.md) for the full security and delivery gates. The `forge-studio` Claude Code skill defines safe project execution and honest capability reporting.
 
 ## MCP tools
 
