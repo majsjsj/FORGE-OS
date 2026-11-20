@@ -1,0 +1,183 @@
+name: FORGE On-Demand Engine Jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine:
+        description: Select only the toolchain needed for this task
+        required: true
+        type: choice
+        options: [web, flutter, godot, unity]
+      project_path:
+        description: Project folder inside the repository (for example workspace/my-app)
+        required: true
+        type: string
+      output:
+        description: Build output
+        required: true
+        type: choice
+        options: [test, apk, aab, web, linux]
+        default: test
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-job-${{ github.workflow }}-${{ github.ref }}-${{ inputs.engine }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    if: inputs.engine == 'web'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate project path
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p = Path(os.environ["PROJECT_PATH"])
+          if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()):
+              raise SystemExit("Unsafe project path")
+          if not (Path.cwd()/p).is_dir():
+              raise SystemExit("Project directory not found")
+          PY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run available web checks
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          cd "$PROJECT_PATH"
+          if [ -f package.json ]; then npm ci --ignore-scripts && npm test --if-present && npm run build --if-present;
+          elif [ -f index.html ]; then test -s index.html;
+          else echo "No supported web project manifest or index.html"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: forge-web-results
+          path: ${{ inputs.project_path }}
+          if-no-files-found: ignore
+          retention-days: 3
+
+  flutter:
+    if: inputs.engine == 'flutter'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Validate Flutter project
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path(os.environ["PROJECT_PATH"])
+          if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
+          if not (Path.cwd()/p/"pubspec.yaml").is_file(): raise SystemExit("pubspec.yaml not found")
+          PY
+      - name: Test and build
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          cd "$PROJECT_PATH"
+          flutter pub get
+          flutter analyze
+          flutter test
+          if [ "$OUTPUT" = apk ]; then flutter build apk --release;
+          elif [ "$OUTPUT" = aab ]; then flutter build appbundle --release;
+          elif [ "$OUTPUT" != test ]; then echo "Flutter output must be test, apk, or aab"; exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: success() && (inputs.output == 'apk' || inputs.output == 'aab')
+        with:
+          name: forge-flutter-${{ inputs.output }}
+          path: ${{ inputs.project_path }}/build/app/outputs/**
+          if-no-files-found: error
+          retention-days: 3
+
+  godot:
+    if: inputs.engine == 'godot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Godot headless editor
+        run: |
+          GODOT_VERSION=4.4.1
+          curl -fsSL "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -o /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          godot --version
+      - name: Validate project and run headless import
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path(os.environ["PROJECT_PATH"])
+          if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
+          if not (Path.cwd()/p/"project.godot").is_file(): raise SystemExit("project.godot not found")
+          PY
+          godot --headless --path "$PROJECT_PATH" --editor --quit
+      - name: Export using a project-defined preset
+        if: inputs.output == 'linux' || inputs.output == 'web'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          PRESET="$OUTPUT"
+          mkdir -p "$PROJECT_PATH/build"
+          godot --headless --path "$PROJECT_PATH" --export-release "$PRESET" "$PROJECT_PATH/build/${OUTPUT}"
+      - uses: actions/upload-artifact@v4
+        if: success() && (inputs.output == 'linux' || inputs.output == 'web')
+        with:
+          name: forge-godot-${{ inputs.output }}
+          path: ${{ inputs.project_path }}/build/**
+          if-no-files-found: error
+          retention-days: 3
+
+  unity:
+    if: inputs.engine == 'unity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require Unity license before allocating build environment
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        run: |
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "::error::Unity cloud build is disabled until an authorized Unity license is added as the UNITY_LICENSE repository secret. No license or paid service will be provisioned automatically."
+            exit 1
+          fi
+      - name: Build Unity project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ inputs.project_path }}
+          targetPlatform: StandaloneLinux64
+          buildsPath: build
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: forge-unity-linux
+          path: build/**
+          if-no-files-found: error
+          retention-days: 3
