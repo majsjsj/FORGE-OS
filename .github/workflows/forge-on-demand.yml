@@ -216,6 +216,21 @@ jobs:
           if not (Path.cwd()/p/"project.godot").is_file(): raise SystemExit("project.godot not found")
           PY
           godot --headless --path "$PROJECT_PATH" --editor --import --quit
+      - name: Install the matching Godot Android Gradle template
+        if: inputs.output == 'aab'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          TEMPLATE="$HOME/.local/share/godot/export_templates/4.4.1.stable/android_source.zip"
+          if [ ! -s "$TEMPLATE" ]; then
+            echo "::error::The Godot 4.4.1 Android Gradle source template is missing from the downloaded export templates."
+            exit 1
+          fi
+          if [ ! -f "$PROJECT_PATH/android/build/build.gradle" ]; then
+            mkdir -p "$PROJECT_PATH/android/build"
+            unzip -q "$TEMPLATE" -d "$PROJECT_PATH/android/build"
+          fi
+          test -s "$PROJECT_PATH/android/build/build.gradle" || { echo "::error::Could not install android/build/build.gradle from the official template."; exit 1; }
       - name: Validate export preset
         if: inputs.output != 'test'
         env:
