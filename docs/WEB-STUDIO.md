@@ -16,7 +16,10 @@ These are blank starter files, not a finished project. An AI agent can create ad
 Open `studio/index.html`. It loads Monaco (the editor engine used by VS Code) from a public CDN, provides HTML/CSS/JavaScript editing, a sandboxed live preview, and desktop/mobile viewport sizing.
 
 - Drafts are saved in browser localStorage only.
-- Preview runs in a sandboxed iframe in the browser; it is not a remote execution environment.
+- Local preview runs in a sandboxed iframe in the browser. A second **OPEN COMMITTED PREVIEW** control loads a committed HTML entry file from the authenticated FORGE preview gateway (for example `workspace/my-game/index.html`).
+- The preview gateway is read-only and serves only files under this public repository's `workspace/` tree. Relative JS, CSS, images, audio, and WebAssembly assets load from the same project folder. It does not run arbitrary server processes.
+- Use the MCP tool `forge_preview_url` to get the same HTTPS URL in Claude. Changes become visible after Claude commits the updated files and the preview is refreshed.
+- For Godot/Unity, preview browser-compatible exports (Web/WebGL) by placing the exported entry HTML and its adjacent assets under `workspace/`; native APK/AAB files cannot run inside an iframe.
 - The editor does not yet commit changes to GitHub automatically. Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) to edit and commit repository files.
 - Monaco requires internet access; a basic text editor fallback is provided.
 
