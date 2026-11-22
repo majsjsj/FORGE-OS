@@ -40,6 +40,38 @@ an isolated environment. Unity's Android target additionally requires a project
 build method named `BuildScript.BuildAndroid`; FORGE does not fabricate a
 production build script.
 
+## Android ABI compatibility policy
+
+FORGE Android starters use a practical phone-first baseline:
+- ARM 32-bit: `armeabi-v7a`
+- ARM 64-bit: `arm64-v8a`
+
+The Godot starter enables both ARM ABIs. The Unity starter's Android build
+script selects both `AndroidArchitecture.ARMv7` and
+`AndroidArchitecture.ARM64`. This covers the common 32-bit and 64-bit ARM
+Android phone families, but does not guarantee compatibility with every
+Android device: minimum Android API level, native plugin ABI availability,
+graphics drivers, RAM, and engine support also matter.
+
+The x86 and x86_64 ABIs are not enabled in the default phone release profile;
+they are mainly useful for selected Intel devices and emulators. Enable them
+only when a project has matching native libraries and a real requirement.
+
+For Google Play, prefer a signed Android App Bundle (AAB). Play can generate
+device-specific APKs from the bundle, avoiding a single oversized universal
+APK. Keep both ARM ABIs in the project when 32-bit ARM devices are part of the
+target audience, and verify that every native plugin ships the required ABI.
+The existing Godot Flappy test preset currently has all four ABI switches on;
+that is a test-specific setting, not a guarantee that every production
+project or plugin supports all four.
+
+Flutter builds should retain the Flutter toolchain's default ABI packaging
+unless a project deliberately configures ABI splits/filters. Native Gradle
+projects should not add restrictive `abiFilters` unless required by their
+native dependencies. Existing Unity projects must have their Player Settings
+Android Target Architectures checked; the starter script setting does not
+retroactively alter arbitrary existing Unity projects.
+
 ## Google Play preparation
 `forge play-package PATH --name ... --package-id ... --short ... --description ...`
 writes `play-store-listing.json` with metadata and a review checklist. It does
