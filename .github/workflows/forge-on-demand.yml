@@ -363,6 +363,20 @@ jobs:
           androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
           androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
           buildsPath: build
+      - name: Disable WebGL compression for reliable GitHub Pages preview
+        if: inputs.output == 'web'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          settings=Path(os.environ["PROJECT_PATH"])/"ProjectSettings"/"ProjectSettings.asset"
+          content=settings.read_text(encoding="utf-8")
+          updated,n=re.subn(r"(?m)^  webGLCompressionFormat: .*?$","  webGLCompressionFormat: 0",content)
+          if n != 1: raise SystemExit("Could not safely set webGLCompressionFormat in ProjectSettings.asset; check this Unity project version before building WebGL.")
+          settings.write_text(updated,encoding="utf-8")
+          PY
       - name: Build Unity WebGL
         if: inputs.output == 'web'
         uses: game-ci/unity-builder@v4
