@@ -18,7 +18,7 @@ Open `studio/index.html`. It loads Monaco (the editor engine used by VS Code) fr
 - Drafts are saved in browser localStorage only.
 - Local preview runs in a sandboxed iframe in the browser. A second **OPEN COMMITTED PREVIEW** control loads a committed HTML entry file from the authenticated FORGE preview gateway (for example `workspace/my-game/index.html`).
 - The preview gateway is read-only and serves only files under this public repository's `workspace/` tree. Relative JS, CSS, images, audio, and WebAssembly assets load from the same project folder. It does not run arbitrary server processes.
-- Use the MCP tool `forge_preview_url` to get the same HTTPS URL in Claude. Changes become visible after Claude commits the updated files and the preview is refreshed.
+- Use the MCP tool `forge_preview_url` to get the same HTTPS URL in Claude. Changes become visible after Claude commits the updated files; the Studio checks the project commit version every five seconds and reloads the game automatically when that folder changes.
 - For Godot/Unity, preview browser-compatible exports (Web/WebGL) by placing the exported entry HTML and its adjacent assets under `workspace/`; native APK/AAB files cannot run inside an iframe.
 - The editor does not yet commit changes to GitHub automatically. Use [GitHub.dev](https://github.dev/majsjsj/FORGE-OS) to edit and commit repository files.
 - Monaco requires internet access; a basic text editor fallback is provided.
