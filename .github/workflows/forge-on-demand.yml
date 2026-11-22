@@ -391,7 +391,7 @@ jobs:
 
 
   publish-game-preview:
-    if: \${{ !cancelled() && inputs.output == 'web' && (inputs.engine == 'godot' || inputs.engine == 'unity') }}
+    if: ${{ !cancelled() && inputs.output == 'web' && (inputs.engine == 'godot' || inputs.engine == 'unity') }}
     needs: [godot, unity]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -400,17 +400,17 @@ jobs:
       cancel-in-progress: false
     environment:
       name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}game-preview/
+      url: ${{ steps.deployment.outputs.page_url }}game-preview/
     steps:
       - uses: actions/checkout@v4
       - name: Download browser game build
         uses: actions/download-artifact@v4
         with:
-          name: \${{ inputs.engine == 'godot' && 'forge-godot-web' || 'forge-unity-web' }}
+          name: ${{ inputs.engine == 'godot' && 'forge-godot-web' || 'forge-unity-web' }}
           path: build
       - name: Prepare Studio and game preview site
         env:
-          ENGINE: \${{ inputs.engine }}
+          ENGINE: ${{ inputs.engine }}
         run: |
           mkdir -p _site/studio _site/workspace/blank-project _site/game-preview
           cp site/index.html _site/index.html
