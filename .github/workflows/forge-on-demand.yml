@@ -316,7 +316,7 @@ jobs:
           ANDROID_KEY_ALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
         run: |
           python - <<'PY'
-          import os
+          import os, re
           from pathlib import Path
           p=Path(os.environ["PROJECT_PATH"])
           if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
