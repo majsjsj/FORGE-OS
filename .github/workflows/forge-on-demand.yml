@@ -177,10 +177,23 @@ jobs:
   godot:
     if: inputs.engine == 'godot'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
-      - name: Install pinned Godot headless editor
+      - uses: actions/setup-java@v4
+        if: inputs.output == 'apk' || inputs.output == 'aab'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK packages for Godot
+        if: inputs.output == 'apk' || inputs.output == 'aab'
+        uses: android-actions/setup-android@v3
+      - name: Install Godot Android SDK components
+        if: inputs.output == 'apk' || inputs.output == 'aab'
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;23.2.8568313" "cmake;3.10.2.4988404"
+          yes | sdkmanager --licenses >/dev/null
+      - name: Install pinned Godot headless editor and export templates
         run: |
           GODOT_VERSION=4.4.1
           curl -fsSL "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -o /tmp/godot.zip
@@ -191,7 +204,7 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           unzip -q /tmp/godot-templates.tpz -d /tmp/godot-templates
           cp /tmp/godot-templates/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
-      - name: Validate project and run headless import
+      - name: Validate project and import resources
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
         run: |
@@ -202,18 +215,69 @@ jobs:
           if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
           if not (Path.cwd()/p/"project.godot").is_file(): raise SystemExit("project.godot not found")
           PY
-          godot --headless --path "$PROJECT_PATH" --editor --quit
-      - name: Export using a project-defined preset
+          godot --headless --path "$PROJECT_PATH" --editor --import --quit
+      - name: Validate export preset
+        if: inputs.output != 'test'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import os, re
+          from pathlib import Path
+          p=Path(os.environ["PROJECT_PATH"])
+          cfg=p/"export_presets.cfg"
+          if not cfg.is_file(): raise SystemExit("export_presets.cfg is required. Create the requested preset in Godot before exporting.")
+          text=cfg.read_text(encoding="utf-8")
+          sections=re.split(r"(?=^\\[preset\\.\\d+\\]\\s*$)", text, flags=re.M)
+          wanted={"apk":"Android","aab":"Android","web":"Web","linux":"Linux"}[os.environ["OUTPUT"]]
+          block=next((s for s in sections if re.search(r'^name="'+re.escape(wanted)+r'"$',s,re.M)),None)
+          if not block: raise SystemExit(f'Missing export preset named "{wanted}".')
+          expected={"apk":"Android","aab":"Android","web":"Web","linux":"Linux"}[os.environ["OUTPUT"]]
+          if not re.search(r'^platform="'+expected+r'"$',block,re.M): raise SystemExit(f'Preset "{wanted}" has the wrong platform.')
+          if os.environ["OUTPUT"]=="aab":
+              if not re.search(r'^gradle_build/use_gradle_build=true$',block,re.M): raise SystemExit('AAB requires gradle_build/use_gradle_build=true in the Android preset.')
+              if not (p/"android"/"build"/"build.gradle").is_file(): raise SystemExit('AAB requires the Godot Android Gradle build template at android/build/build.gradle.')
+              if not re.search(r'^gradle_build/export_format=1$',block,re.M): raise SystemExit('AAB requires gradle_build/export_format=1 in the Android preset.')
+          PY
+      - name: Export Android debug APK
+        if: inputs.output == 'apk'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          mkdir -p "$PROJECT_PATH/build"
+          godot --headless --path "$PROJECT_PATH" --export-debug "Android" "$PROJECT_PATH/build/forge-android-debug.apk"
+          test -s "$PROJECT_PATH/build/forge-android-debug.apk"
+      - name: Export signed Android App Bundle
+        if: inputs.output == 'aab'
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          GODOT_KEYSTORE_B64: ${{ secrets.GODOT_ANDROID_KEYSTORE_BASE64 }}
+          GODOT_KEY_ALIAS: ${{ secrets.GODOT_ANDROID_KEYSTORE_RELEASE_USER }}
+          GODOT_KEY_PASSWORD: ${{ secrets.GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD }}
+        run: |
+          if [ -z "$GODOT_KEYSTORE_B64" ] || [ -z "$GODOT_KEY_ALIAS" ] || [ -z "$GODOT_KEY_PASSWORD" ]; then
+            echo "::error::AAB release requires GODOT_ANDROID_KEYSTORE_BASE64, GODOT_ANDROID_KEYSTORE_RELEASE_USER and GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD repository secrets. No unsigned store bundle will be produced."
+            exit 1
+          fi
+          printf '%s' "$GODOT_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/forge-release.keystore"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH="$RUNNER_TEMP/forge-release.keystore"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$GODOT_KEY_ALIAS"
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$GODOT_KEY_PASSWORD"
+          mkdir -p "$PROJECT_PATH/build"
+          godot --headless --path "$PROJECT_PATH" --export-release "Android" "$PROJECT_PATH/build/forge-release.aab"
+          test -s "$PROJECT_PATH/build/forge-release.aab"
+      - name: Export Web or Linux build
         if: inputs.output == 'linux' || inputs.output == 'web'
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
           OUTPUT: ${{ inputs.output }}
         run: |
-          PRESET="$OUTPUT"
           mkdir -p "$PROJECT_PATH/build"
-          godot --headless --path "$PROJECT_PATH" --export-release "$PRESET" "$PROJECT_PATH/build/${OUTPUT}"
+          godot --headless --path "$PROJECT_PATH" --export-release "$OUTPUT" "$PROJECT_PATH/build/$OUTPUT"
+          test -e "$PROJECT_PATH/build/$OUTPUT"
       - uses: actions/upload-artifact@v4
-        if: success() && (inputs.output == 'linux' || inputs.output == 'web')
+        if: success() && (inputs.output == 'apk' || inputs.output == 'aab' || inputs.output == 'linux' || inputs.output == 'web')
         with:
           name: forge-godot-${{ inputs.output }}
           path: ${{ inputs.project_path }}/build/**
@@ -223,18 +287,66 @@ jobs:
   unity:
     if: inputs.engine == 'unity'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
-      - name: Require Unity license before allocating build environment
+      - name: Validate Unity project and license
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          OUTPUT: ${{ inputs.output }}
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          ANDROID_KEY_ALIAS_PASS: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          p=Path(os.environ["PROJECT_PATH"])
+          if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
+          if not (p/"Assets").is_dir() or not (p/"ProjectSettings"/"ProjectVersion.txt").is_file(): raise SystemExit("Not a valid Unity project: Assets/ and ProjectSettings/ProjectVersion.txt are required.")
+          if not os.environ.get("UNITY_LICENSE"): raise SystemExit("Unity cloud build is disabled until UNITY_LICENSE is added as a GitHub Actions secret.")
+          if os.environ["OUTPUT"]=="aab":
+              missing=[n for n,v in [("ANDROID_KEYSTORE_BASE64",os.environ.get("ANDROID_KEYSTORE")),("ANDROID_KEYSTORE_PASS",os.environ.get("ANDROID_KEYSTORE_PASS")),("ANDROID_KEYALIAS_NAME",os.environ.get("ANDROID_KEY_ALIAS")),("ANDROID_KEYALIAS_PASS",os.environ.get("ANDROID_KEY_ALIAS_PASS"))] if not v]
+              if missing: raise SystemExit("AAB release requires repository secrets: "+", ".join(missing))
+          PY
+      - name: Build Unity Android APK
+        if: inputs.output == 'apk'
+        uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-        run: |
-          if [ -z "$UNITY_LICENSE" ]; then
-            echo "::error::Unity cloud build is disabled until an authorized Unity license is added as the UNITY_LICENSE repository secret. No license or paid service will be provisioned automatically."
-            exit 1
-          fi
-      - name: Build Unity project
+        with:
+          projectPath: ${{ inputs.project_path }}
+          targetPlatform: Android
+          androidExportType: androidPackage
+          buildsPath: build
+      - name: Build Unity Android AAB
+        if: inputs.output == 'aab'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ inputs.project_path }}
+          targetPlatform: Android
+          androidExportType: androidAppBundle
+          androidKeystoreName: forge-release.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+          buildsPath: build
+      - name: Build Unity WebGL
+        if: inputs.output == 'web'
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: ${{ inputs.project_path }}
+          targetPlatform: WebGL
+          buildsPath: build
+      - name: Build Unity Linux
+        if: inputs.output == 'linux'
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -245,7 +357,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: forge-unity-linux
+          name: forge-unity-${{ inputs.output }}
           path: build/**
           if-no-files-found: error
           retention-days: 3
