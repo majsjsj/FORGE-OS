@@ -194,7 +194,7 @@ async function callTool(name, args, env) {
   if (name === "forge_preview_url") {
     const entry = validateWorkspacePath(args.entry_file);
     if (!entry.toLowerCase().endsWith(".html")) throw new Error("entry_file must point to a committed .html file inside workspace/.");
-    const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\\/$/, "");
+    const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\/$/, "");
     return { entry_file: entry, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/"),
       mode: "interactive-browser-preview", source: "committed main branch",
       note: "The preview updates after the new files are committed. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
@@ -304,7 +304,7 @@ export default {
       let projectFile;
       try { projectFile = decodeURIComponent(url.pathname.slice("/preview/".length)); }
       catch { return new Response("Invalid preview path", { status: 400 }); }
-      if (!/^workspace\\/[A-Za-z0-9._/-]+$/.test(projectFile) || projectFile.includes("..") ||
+      if (!/^workspace\/[A-Za-z0-9._/-]+$/.test(projectFile) || projectFile.includes("..") ||
           projectFile.split("/").some(part => !part || part.startsWith("."))) return new Response("Invalid preview path", { status: 400 });
       const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/main/" + projectFile);
       if (!upstream.ok) return new Response(upstream.status === 404 ? "Preview file not found in the public main branch." : "Preview source unavailable.", { status: upstream.status });
