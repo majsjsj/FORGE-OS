@@ -77,6 +77,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.50.1'
           channel: stable
           cache: true
       - name: Validate Flutter project
@@ -90,6 +91,43 @@ jobs:
           if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()): raise SystemExit("Unsafe project path")
           if not (Path.cwd()/p/"pubspec.yaml").is_file(): raise SystemExit("pubspec.yaml not found")
           PY
+      - name: Verify Android SDK requirements
+        if: inputs.output == 'apk' || inputs.output == 'aab'
+        run: |
+          fail() { echo "::error title=Android SDK check failed::$1"; exit 1; }
+
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
+            fail "Android SDK not found: ANDROID_HOME/ANDROID_SDK_ROOT is unset or its directory is missing on this runner."
+          fi
+
+          SDKMANAGER="$(command -v sdkmanager || true)"
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(ls -1 "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -z "$SDKMANAGER" ] || [ ! -x "$SDKMANAGER" ]; then
+            fail "sdkmanager (Android cmdline-tools) not found under $SDK/cmdline-tools."
+          fi
+
+          JAVA_MAJOR="$(java -version 2>&1 | sed -n '1s/.*version "\([0-9]*\).*/\1/p')"
+          if [ "${JAVA_MAJOR:-0}" -lt 17 ]; then
+            fail "Java 17 or newer is required for the Android build, found: ${JAVA_MAJOR:-unknown}."
+          fi
+
+          BT_LATEST="$(ls -1 "$SDK/build-tools" 2>/dev/null | sort -V | tail -n1 || true)"
+          if [ -z "$BT_LATEST" ]; then
+            fail "No Android build-tools found under $SDK/build-tools."
+          fi
+          if [ "$(printf '%s\n' 28.0.3 "$BT_LATEST" | sort -V | head -n1)" != "28.0.3" ]; then
+            fail "Android build-tools $BT_LATEST is older than the 28.0.3 minimum required by Flutter."
+          fi
+
+          LICENSE_OUT="$(yes n 2>/dev/null | timeout 120 "$SDKMANAGER" --sdk_root="$SDK" --licenses 2>&1 || true)"
+          if ! printf '%s\n' "$LICENSE_OUT" | grep -q "All SDK package licenses accepted"; then
+            fail "Android SDK licenses are not all accepted on this runner (or the license check did not finish). Review the license terms and accept them explicitly in this workflow before building."
+          fi
+
+          echo "Android SDK check passed: sdk=$SDK build-tools=$BT_LATEST java=$JAVA_MAJOR licenses=accepted"
       - name: Generate Android platform when missing
         if: inputs.output == 'apk' || inputs.output == 'aab'
         env:
