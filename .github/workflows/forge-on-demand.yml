@@ -21,6 +21,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
   group: forge-job-${{ github.workflow }}-${{ github.ref }}-${{ inputs.engine }}
@@ -386,3 +388,48 @@ jobs:
           path: build/**
           if-no-files-found: error
           retention-days: 3
+
+
+  publish-game-preview:
+    if: \${{ !cancelled() && inputs.output == 'web' && (inputs.engine == 'godot' || inputs.engine == 'unity') }}
+    needs: [godot, unity]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}game-preview/
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download browser game build
+        uses: actions/download-artifact@v4
+        with:
+          name: \${{ inputs.engine == 'godot' && 'forge-godot-web' || 'forge-unity-web' }}
+          path: build
+      - name: Prepare Studio and game preview site
+        env:
+          ENGINE: \${{ inputs.engine }}
+        run: |
+          mkdir -p _site/studio _site/workspace/blank-project _site/game-preview
+          cp site/index.html _site/index.html
+          cp studio/index.html studio/studio.css studio/studio.js _site/studio/
+          cp workspace/blank-project/index.html workspace/blank-project/styles.css workspace/blank-project/script.js _site/workspace/blank-project/
+          ENTRY="$(find build -type f -name index.html -print -quit)"
+          if [ -z "$ENTRY" ]; then
+            echo "::error::The Web export artifact does not contain index.html."
+            find build -maxdepth 4 -type f | head -n 80
+            exit 1
+          fi
+          cp -a "$(dirname "$ENTRY")/." _site/game-preview/
+          touch _site/.nojekyll
+          touch _site/game-preview/.nojekyll
+          echo "Prepared $ENGINE browser build from $ENTRY"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy interactive game preview
+        id: deployment
+        uses: actions/deploy-pages@v4
