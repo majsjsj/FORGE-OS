@@ -325,6 +325,9 @@ jobs:
           if os.environ["OUTPUT"]=="aab":
               missing=[n for n,v in [("ANDROID_KEYSTORE_BASE64",os.environ.get("ANDROID_KEYSTORE")),("ANDROID_KEYSTORE_PASS",os.environ.get("ANDROID_KEYSTORE_PASS")),("ANDROID_KEYALIAS_NAME",os.environ.get("ANDROID_KEY_ALIAS")),("ANDROID_KEYALIAS_PASS",os.environ.get("ANDROID_KEY_ALIAS_PASS"))] if not v]
               if missing: raise SystemExit("AAB release requires repository secrets: "+", ".join(missing))
+              settings=(p/"ProjectSettings"/"ProjectSettings.asset").read_text(encoding="utf-8")
+              if not re.search(r"^  AndroidUseCustomKeystore: 1$",settings,re.M):
+                  raise SystemExit("Enable Custom Keystore in Unity Player Settings before requesting an AAB.")
           PY
       - name: Build Unity Android APK
         if: inputs.output == 'apk'
