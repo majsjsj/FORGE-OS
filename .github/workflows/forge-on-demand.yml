@@ -122,9 +122,20 @@ jobs:
             fail "Android build-tools $BT_LATEST is older than the 28.0.3 minimum required by Flutter."
           fi
 
-          LICENSE_OUT="$(yes n 2>/dev/null | timeout 120 "$SDKMANAGER" --sdk_root="$SDK" --licenses 2>&1 || true)"
-          if ! printf '%s\n' "$LICENSE_OUT" | grep -q "All SDK package licenses accepted"; then
-            fail "Android SDK licenses are not all accepted on this runner (or the license check did not finish). Review the license terms and accept them explicitly in this workflow before building."
+          # Accept pending Android SDK package licenses as explicitly authorized by the repository owner.
+          # This applies only to Android SDK licenses on this temporary GitHub Actions runner.
+          set +o pipefail
+          LICENSE_LOG="$(mktemp)"
+          if ! yes | timeout 300 "$SDKMANAGER" --sdk_root="$SDK" --licenses > "$LICENSE_LOG" 2>&1; then
+            echo "---- sdkmanager --licenses output (last 60 lines) ----"
+            tail -n 60 "$LICENSE_LOG"
+            fail "sdkmanager --licenses failed or timed out; Android SDK licenses could not be accepted."
+          fi
+          tail -n 5 "$LICENSE_LOG"
+          if ! grep -q "All SDK package licenses accepted" "$LICENSE_LOG"; then
+            echo "---- sdkmanager --licenses output (last 60 lines) ----"
+            tail -n 60 "$LICENSE_LOG"
+            fail "sdkmanager did not confirm that all Android SDK package licenses were accepted."
           fi
 
           echo "Android SDK check passed: sdk=$SDK build-tools=$BT_LATEST java=$JAVA_MAJOR licenses=accepted"
