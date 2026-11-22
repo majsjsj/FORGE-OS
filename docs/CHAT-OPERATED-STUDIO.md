@@ -9,7 +9,7 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 - The mobile adapters can invoke Flutter, Gradle, Godot, and Unity when those toolchains are installed in the execution environment.
 - A project template or local adapter is not evidence of a successful cloud build.
 - The repository now contains a deployable single-owner Cloudflare Worker remote MCP controller and a manual deployment workflow. It is not live until the owner adds Cloudflare/GitHub repository secrets and runs that deployment workflow.
-- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, inspect runs, and return a public read-only interactive preview URL for committed HTML entry files under workspace/. The preview gateway proxies only files from the public repository's main branch and supports relative assets and WebAssembly. It is not an arbitrary process runner, a multi-user workspace service, or a per-user secrets vault.
+- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, inspect runs, and return a public read-only interactive preview URL for committed HTML entry files under workspace/. It can also return the latest Godot/Unity Web build URL after the workflow successfully deploys that build to GitHub Pages. The preview gateway proxies only files from the public repository's main branch and supports relative assets and WebAssembly. It is not an arbitrary process runner, a multi-user workspace service, or a per-user secrets vault.
 
 ## Required architecture
 
