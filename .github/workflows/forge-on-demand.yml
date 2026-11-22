@@ -229,7 +229,7 @@ jobs:
           cfg=p/"export_presets.cfg"
           if not cfg.is_file(): raise SystemExit("export_presets.cfg is required. Create the requested preset in Godot before exporting.")
           text=cfg.read_text(encoding="utf-8")
-          sections=re.split(r"(?=^\\[preset\\.\\d+\\]\\s*$)", text, flags=re.M)
+          sections=re.split(r"(?=^\[preset\.\d+\]\s*$)", text, flags=re.M)
           wanted={"apk":"Android","aab":"Android","web":"Web","linux":"Linux"}[os.environ["OUTPUT"]]
           block=next((s for s in sections if re.search(r'^name="'+re.escape(wanted)+r'"$',s,re.M)),None)
           if not block: raise SystemExit(f'Missing export preset named "{wanted}".')
