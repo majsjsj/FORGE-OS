@@ -221,7 +221,9 @@ jobs:
             "ndk;23.2.8568313" \
             "cmake;3.10.2.4988404"
 
+          set +o pipefail
           yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses >/dev/null
+          set -o pipefail
           echo "Android SDK configured at $SDK using $SDKMANAGER"
       - name: Install pinned Godot headless editor and export templates
         run: |
