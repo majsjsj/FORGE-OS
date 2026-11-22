@@ -9,7 +9,7 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 - The mobile adapters can invoke Flutter, Gradle, Godot, and Unity when those toolchains are installed in the execution environment.
 - A project template or local adapter is not evidence of a successful cloud build.
 - The repository now contains a deployable single-owner Cloudflare Worker remote MCP controller and a manual deployment workflow. It is not live until the owner adds Cloudflare/GitHub repository secrets and runs that deployment workflow.
-- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, and inspect runs. It is not a multi-user workspace service and has no per-user secrets vault.
+- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, inspect runs, and return a public read-only interactive preview URL for committed HTML entry files under workspace/. The preview gateway proxies only files from the public repository's main branch and supports relative assets and WebAssembly. It is not an arbitrary process runner, a multi-user workspace service, or a per-user secrets vault.
 
 ## Required architecture
 
@@ -17,7 +17,7 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 The first implementation is a single-owner Cloudflare Worker using stateless Streamable HTTP and a bearer token. It exposes workspace text-file operations, build dispatch, build status, logs, artifact metadata, and temporary signed ZIP download URLs. The owner must deploy it and connect it as a Claude custom connector; the local `.mcp.json` stdio entry remains useful for Claude Code. Multi-user OAuth and tenant identity mapping are not implemented.
 
 ### 2. Build plane
-Build jobs run in short-lived GitHub-hosted runners and check out committed project files from the repository's main branch. They return a run ID, logs, test summaries, and short-lived artifacts. The controller does not yet upload uncommitted browser drafts or create isolated per-project snapshots. Godot Android export is not enabled. Unity currently targets Linux and requires a valid license secret. Flutter APK/AAB builds are unsigned.
+Build jobs run in short-lived GitHub-hosted runners and check out committed project files from the repository's main branch. They return a run ID, logs, test summaries, and short-lived artifacts. The controller does not yet upload uncommitted browser drafts or create isolated per-project snapshots. Godot Android APK/AAB and Web export jobs are now defined; AAB requires the project's Gradle template, matching export preset, and secure signing secrets. Unity Android APK/AAB and WebGL jobs are now defined and require a valid Unity license; AAB also requires signing secrets. These workflow edits are not yet verified by a cloud build. Flutter APK/AAB builds are unsigned.
 
 ### 3. Tenant isolation and secret vault
 Every user and project must have an authenticated tenant ID. Secret reads and writes must be authorized server-side for that tenant and project. Encrypt secrets at rest using a managed key or envelope-encryption design; redact values from logs; pass secrets to jobs only at runtime. Do not put credentials in Git, project prompts, ordinary chat, workflow artifacts, or public issue threads.
@@ -33,10 +33,11 @@ Claude is the initial reasoning engine. Keep the model adapter interface provide
 ## Delivery gates
 1. Flutter cloud APK built, downloaded, installed, and smoke-tested.
 2. MCP remote control deployed; create/edit/test/build/status/artifact flow verified from a phone.
-3. Godot cloud Android export built and verified.
+3. Godot cloud Android APK and signed AAB export built and verified; Web export opened interactively through the preview gateway.
 4. Authenticated tenant isolation and encrypted secret vault tested with two separate users.
-5. Unity cloud export verified under a compliant license and a no-surprise-cost policy.
-6. Release signing, ads, and payment integrations added only after secure secret entry and approval gates pass.
+5. Unity Android APK/AAB and WebGL export verified under a compliant license and a no-surprise-cost policy.
+6. Remote interactive preview tested on a phone with an HTML project and a Godot/Unity Web export.
+7. Release signing, ads, and payment integrations added only after secure secret entry and approval gates pass.
 
 ## Free-first constraints
 Keep the repository public and do not add a paid dependency or paid runner. Free quotas are limited and can change; the system must surface quota limits and fail closed rather than silently switching to paid infrastructure. No unlimited-free-build promise is made.
