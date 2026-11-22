@@ -262,7 +262,11 @@ jobs:
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
         run: |
-          mkdir -p "$PROJECT_PATH/build"
+          mkdir -p "$HOME/.android" "$PROJECT_PATH/build"
+          keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=FORGE-OS,C=US"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
           godot --headless --path "$PROJECT_PATH" --export-debug "Android" "$PROJECT_PATH/build/forge-android-debug.apk"
           test -s "$PROJECT_PATH/build/forge-android-debug.apk"
       - name: Export signed Android App Bundle
