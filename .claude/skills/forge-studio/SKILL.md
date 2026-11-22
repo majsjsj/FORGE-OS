@@ -40,9 +40,10 @@ You are the project director. Use the FORGE-OS MCP tools when they are available
 ## Remote chat control and interactive preview
 - The deployed Cloudflare Worker is the remote MCP control plane for the connected Claude custom connector. Use its authenticated workspace/build tools; the local stdio `.mcp.json` remains separate.
 - Use `forge_preview_url` after committing a browser entry file under workspace/. It returns an HTTPS URL served by the read-only preview route. Relative JS/CSS/images/WASM assets resolve from the same committed project folder.
+- After a successful Godot/Unity Web build, call `forge_game_preview_url`. It returns the GitHub Pages game URL only when the workflow's `publish-game-preview` job succeeded. The Studio also has an **OPEN LAST WEB GAME** button for this published build.
 - The Studio page also has an OPEN COMMITTED PREVIEW control. Enter the exact committed HTML entry path, such as `workspace/my-game/index.html` or `workspace/my-game/build/index.html`.
 - The preview route serves committed public repository files; it is interactive in a browser/iframe, not a persistent remote game process. A new commit is needed for changed source to appear. Native APKs cannot run inside the iframe.
-- For Godot/Unity Web exports, first export the project, then place/commit the generated web output under workspace/ and preview its index.html. Do not claim an exported Web build is live until its entry file and assets are reachable through the preview URL.
+- For Godot/Unity Web exports, the on-demand workflow publishes the exported browser build to GitHub Pages at the shared game-preview path. Do not claim an exported Web build is live until the `publish-game-preview` job succeeds and `forge_game_preview_url` confirms the URL.
 - Claude's native chat may render a URL/link rather than embed a playable game inline. The FORGE Studio iframe is the supported interactive surface; do not promise native inline chat embedding unless the client explicitly supports it.
 
 ## Browser workspace and UI/UX workflow
