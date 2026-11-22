@@ -109,6 +109,11 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." } }, required: ["entry_file"], additionalProperties: false },
   },
   {
+    name: "forge_game_preview_url",
+    description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return the playable browser preview URL. Read-only; does not start a build.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -200,6 +205,22 @@ async function callTool(name, args, env) {
       version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/"),
       mode: "interactive-browser-preview", auto_refresh: true, source: "committed main branch",
       note: "The preview refreshes after a new commit touching this project folder. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
+  }
+
+  if (name === "forge_game_preview_url") {
+    const data = await github(env, `actions/workflows/${WORKFLOW}/runs?per_page=30`);
+    for (const run of data.workflow_runs || []) {
+      if (run.status !== "completed" || run.conclusion !== "success") continue;
+      const result = await github(env, `actions/runs/${run.id}/artifacts?per_page=100`);
+      const artifact = (result.artifacts || []).find(a =>
+        !a.expired && ["forge-godot-web", "forge-unity-web"].includes(a.name));
+      if (!artifact) continue;
+      return { found: true, engine: artifact.name.startsWith("forge-godot") ? "Godot" : "Unity",
+        run_id: run.id, run_url: run.html_url, artifact_name: artifact.name,
+        preview_url: "https://majsjsj.github.io/FORGE-OS/game-preview/",
+        note: "This URL serves the latest successful Web build that completed the preview-site deployment. It is interactive in a browser; Android APK/AAB files are not browser previews." };
+    }
+    return { found: false, message: "No successful Godot or Unity Web build with a completed Pages deployment was found yet. Request an authorized Web build first." };
   }
 
   if (name === "forge_health") {
@@ -371,7 +392,7 @@ export default {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "FORGE-OS Remote Controller", version: "0.1.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects and exported Web builds; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
