@@ -335,13 +335,19 @@ export default {
         svg:"image/svg+xml", png:"image/png", jpg:"image/jpeg", jpeg:"image/jpeg", webp:"image/webp", gif:"image/gif",
         ico:"image/x-icon", mp3:"audio/mpeg", ogg:"audio/ogg", wav:"audio/wav", pck:"application/octet-stream",
         data:"application/octet-stream", br:"application/octet-stream", gz:"application/gzip", ttf:"font/ttf", woff:"font/woff", woff2:"font/woff2" };
+      const lowerPath = projectFile.toLowerCase();
+      let contentType = types[ext] || "application/octet-stream";
+      if (lowerPath.endsWith(".wasm.br") || lowerPath.endsWith(".wasm.gz")) contentType = "application/wasm";
+      else if (lowerPath.endsWith(".js.br") || lowerPath.endsWith(".js.gz")) contentType = "application/javascript; charset=utf-8";
+      else if (lowerPath.endsWith(".css.br") || lowerPath.endsWith(".css.gz")) contentType = "text/css; charset=utf-8";
       const headers = new Headers(upstream.headers);
-      headers.set("content-type", types[ext] || "application/octet-stream");
+      headers.set("content-type", contentType);
       headers.set("cache-control", "no-store, max-age=0");
       headers.set("access-control-allow-origin", "*");
       headers.set("cross-origin-resource-policy", "cross-origin");
       headers.set("x-content-type-options", "nosniff");
-      if (projectFile.toLowerCase().endsWith(".br")) headers.set("content-encoding", "br");
+      if (lowerPath.endsWith(".br")) headers.set("content-encoding", "br");
+      else if (lowerPath.endsWith(".gz")) headers.set("content-encoding", "gzip");
       return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
     }
     if (!authorized(request, env)) return json({ error: "Unauthorized" }, 401);
