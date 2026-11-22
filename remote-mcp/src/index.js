@@ -211,6 +211,8 @@ async function callTool(name, args, env) {
     const data = await github(env, `actions/workflows/${WORKFLOW}/runs?per_page=30`);
     for (const run of data.workflow_runs || []) {
       if (run.status !== "completed" || run.conclusion !== "success") continue;
+      const jobs = await github(env, `actions/runs/${run.id}/jobs?per_page=100`);
+      if (!(jobs.jobs || []).some(job => job.name === "publish-game-preview" && job.conclusion === "success")) continue;
       const result = await github(env, `actions/runs/${run.id}/artifacts?per_page=100`);
       const artifact = (result.artifacts || []).find(a =>
         !a.expired && ["forge-godot-web", "forge-unity-web"].includes(a.name));
