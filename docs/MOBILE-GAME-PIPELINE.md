@@ -13,7 +13,16 @@ the Unity Editor and Android Build Support modules. Godot Android export require
 the Android export templates, SDK/JDK setup and an export preset. Flutter
 requires the Flutter SDK and Android toolchain.
 
-## Builds
+## Remote cloud builds
+The manual GitHub Actions workflow `forge-on-demand.yml` is available through the authenticated FORGE MCP controller. It accepts one engine and one output per run; it is never triggered by a normal file commit.
+
+- Godot: `test`, `apk`, `aab`, `web`, `linux`. Use export preset names exactly `Android`, `Web`, and `Linux`. The Android APK is a debug/test package. AAB requires the Android preset to enable Gradle (`gradle_build/use_gradle_build=true`), set `gradle_build/export_format=1`, include `android/build/build.gradle`, and use the dedicated GitHub keystore secrets for release signing.
+- Unity: `apk`, `aab`, `web`, `linux`. A valid `UNITY_LICENSE` secret is required. AAB requires `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEYALIAS_NAME`, and `ANDROID_KEYALIAS_PASS` GitHub secrets, plus Custom Keystore enabled in Unity Player Settings.
+- Flutter: `test`, `apk`, `aab`; the existing pipeline is unchanged. Do not treat its current debug/unsigned test artifacts as store-ready releases.
+
+These workflow changes are committed but have not yet been exercised by a new Actions build. Builds remain gated by explicit user approval.
+
+## Local Builds
 - `forge build PATH apk`
 - `forge build PATH aab`
 - `forge build PATH godot-android-debug`
