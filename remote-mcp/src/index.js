@@ -104,6 +104,11 @@ const TOOLS = [
     },
   },
   {
+    name: "forge_preview_url",
+    description: "Return an interactive HTTPS preview URL for a committed HTML entry file inside workspace/. Relative JS, CSS, image, audio, and WebAssembly assets are served from the same project folder. This is a public read-only preview of the public repository; it does not start a build or consume Actions quota.",
+    inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." } }, required: ["entry_file"], additionalProperties: false },
+  },
+  {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -184,6 +189,15 @@ async function callTool(name, args, env) {
     const saved = await github(env, `contents/${path}`, { method: "PUT", body: JSON.stringify(payload) });
     return { saved: true, path: saved.content.path, sha: saved.content.sha,
       commit_sha: saved.commit.sha, html_url: saved.content.html_url };
+  }
+
+  if (name === "forge_preview_url") {
+    const entry = validateWorkspacePath(args.entry_file);
+    if (!entry.toLowerCase().endsWith(".html")) throw new Error("entry_file must point to a committed .html file inside workspace/.");
+    const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\\/$/, "");
+    return { entry_file: entry, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/"),
+      mode: "interactive-browser-preview", source: "committed main branch",
+      note: "The preview updates after the new files are committed. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
   }
 
   if (name === "forge_health") {
@@ -284,8 +298,32 @@ async function callTool(name, args, env) {
 
 export default {
   async fetch(request, env) {
-    if (!authorized(request, env)) return json({ error: "Unauthorized" }, 401);
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/preview/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
+      let projectFile;
+      try { projectFile = decodeURIComponent(url.pathname.slice("/preview/".length)); }
+      catch { return new Response("Invalid preview path", { status: 400 }); }
+      if (!/^workspace\\/[A-Za-z0-9._/-]+$/.test(projectFile) || projectFile.includes("..") ||
+          projectFile.split("/").some(part => !part || part.startsWith("."))) return new Response("Invalid preview path", { status: 400 });
+      const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/main/" + projectFile);
+      if (!upstream.ok) return new Response(upstream.status === 404 ? "Preview file not found in the public main branch." : "Preview source unavailable.", { status: upstream.status });
+      const ext = projectFile.toLowerCase().split(".").pop();
+      const types = { html:"text/html; charset=utf-8", htm:"text/html; charset=utf-8", js:"application/javascript; charset=utf-8",
+        css:"text/css; charset=utf-8", json:"application/json; charset=utf-8", wasm:"application/wasm",
+        svg:"image/svg+xml", png:"image/png", jpg:"image/jpeg", jpeg:"image/jpeg", webp:"image/webp", gif:"image/gif",
+        ico:"image/x-icon", mp3:"audio/mpeg", ogg:"audio/ogg", wav:"audio/wav", pck:"application/octet-stream",
+        data:"application/octet-stream", br:"application/octet-stream", gz:"application/gzip", ttf:"font/ttf", woff:"font/woff", woff2:"font/woff2" };
+      const headers = new Headers(upstream.headers);
+      headers.set("content-type", types[ext] || "application/octet-stream");
+      headers.set("cache-control", "no-store, max-age=0");
+      headers.set("access-control-allow-origin", "*");
+      headers.set("cross-origin-resource-policy", "cross-origin");
+      headers.set("x-content-type-options", "nosniff");
+      if (projectFile.toLowerCase().endsWith(".br")) headers.set("content-encoding", "br");
+      return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
+    }
+    if (!authorized(request, env)) return json({ error: "Unauthorized" }, 401);
     if (url.pathname === "/health" && request.method === "GET")
       return json({ ok: true, service: "FORGE Remote Controller" });
     if (url.pathname === "/mcp" && request.method !== "POST")
@@ -306,7 +344,7 @@ export default {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "FORGE-OS Remote Controller", version: "0.1.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Never claim a build succeeded until forge_build_details confirms it.",
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects and exported Web builds; preview is read-only and updates after commits. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
