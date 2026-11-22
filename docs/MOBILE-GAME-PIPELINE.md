@@ -14,6 +14,9 @@ the Android export templates, SDK/JDK setup and an export preset. Flutter
 requires the Flutter SDK and Android toolchain.
 
 ## Remote cloud builds
+
+Godot and Unity support both 2D and 3D projects through the same engine pipeline; the project settings, renderer, scenes and assets determine whether a game is 2D or 3D. There is no separate 2D/3D build job. Web preview requires the selected project's features and plugins to support that engine's Web/WebGL export target.
+
 The manual GitHub Actions workflow `forge-on-demand.yml` is available through the authenticated FORGE MCP controller. It accepts one engine and one output per run; it is never triggered by a normal file commit.
 
 - Godot: `test`, `apk`, `aab`, `web`, `linux`. Use export preset names exactly `Android`, `Web`, and `Linux`. The Android APK is a debug/test package. AAB requires the Android preset to enable Gradle (`gradle_build/use_gradle_build=true`), set `gradle_build/export_format=1`, include `android/build/build.gradle`, and use the dedicated GitHub keystore secrets for release signing.
