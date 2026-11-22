@@ -215,7 +215,7 @@ async function callTool(name, args, env) {
     }
     const allowed = {
       web: ["test", "web"], flutter: ["test", "apk", "aab"],
-      godot: ["test", "web", "linux"], unity: ["linux"],
+      godot: ["test", "apk", "aab", "web", "linux"], unity: ["apk", "aab", "web", "linux"],
     };
     if (!allowed[engine].includes(output)) throw new Error(`Output ${output} is not supported for ${engine}.`);
     await github(env, `actions/workflows/${WORKFLOW}/dispatches`, {
