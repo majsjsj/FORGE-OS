@@ -19,15 +19,20 @@
 - [x] Android Gradle starter scaffold
 - [x] Browser game starter scaffold
 - [x] SaaS/API FastAPI starter scaffolds
-- [ ] Web framework/build/test adapters and preview workflow
+- [x] Web framework/build/test adapters and committed-file interactive preview gateway (read-only; static Web projects)
+- [ ] Persistent remote engine runtime for live Unity/Godot editor sessions
 - [x] Flutter, Unity and Godot starter project scaffolds
 - [x] Local toolchain detection and guarded APK/AAB build adapters
 - [ ] Android SDK emulator tests, signing and release artifact verification
 - [x] Initial Godot/Unity Android export entry points
 - [ ] Full Godot export preset automation, Unity project settings and gameplay test automation
+- [x] On-demand Godot Android APK/AAB and Web export workflow definitions (pending first authorized build verification)
+- [x] On-demand Unity Android APK/AAB and WebGL workflow definitions (pending license/secrets and first authorized build verification)
 - [x] Google Play listing metadata and release checklist generator (manual publishing)
 - [x] AdMob integration planning with test placeholders (SDK integration remains engine/version-specific)
 - [ ] Production SaaS auth, tenant isolation, database, billing, and deployment workflows
+
+- [x] Remote interactive preview URL MCP tool and five-second project commit refresh in Studio
 
 ## Phase 3 — FORGE Vision (partial)
 - [x] Image metadata inspection
