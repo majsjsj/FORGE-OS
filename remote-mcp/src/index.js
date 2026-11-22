@@ -195,9 +195,11 @@ async function callTool(name, args, env) {
     const entry = validateWorkspacePath(args.entry_file);
     if (!entry.toLowerCase().endsWith(".html")) throw new Error("entry_file must point to a committed .html file inside workspace/.");
     const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\/$/, "");
+    const projectDir = entry.slice(0, entry.lastIndexOf("/"));
     return { entry_file: entry, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/"),
-      mode: "interactive-browser-preview", source: "committed main branch",
-      note: "The preview updates after the new files are committed. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
+      version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/"),
+      mode: "interactive-browser-preview", auto_refresh: true, source: "committed main branch",
+      note: "The preview refreshes after a new commit touching this project folder. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
   }
 
   if (name === "forge_health") {
@@ -299,6 +301,25 @@ async function callTool(name, args, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/preview-version/")) {
+      if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
+      let projectDir;
+      try { projectDir = decodeURIComponent(url.pathname.slice("/preview-version/".length)); }
+      catch { return new Response("Invalid preview path", { status: 400 }); }
+      try {
+        validateWorkspacePath(projectDir, true);
+        const commits = await github(env, "commits?path=" + encodeURIComponent(projectDir) + "&per_page=1");
+        return new Response(JSON.stringify({ version: commits[0]?.sha || null }), {
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
+            "access-control-allow-origin": "*", "x-content-type-options": "nosniff" }
+        });
+      } catch (error) {
+        return new Response(JSON.stringify({ error: String(error?.message || error) }), {
+          status: 400, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
+            "access-control-allow-origin": "*" }
+        });
+      }
+    }
     if (url.pathname.startsWith("/preview/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
       let projectFile;
@@ -344,7 +365,7 @@ export default {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "FORGE-OS Remote Controller", version: "0.1.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects and exported Web builds; preview is read-only and updates after commits. Never claim a build succeeded until forge_build_details confirms it.",
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects and exported Web builds; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
