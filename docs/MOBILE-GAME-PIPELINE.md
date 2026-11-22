@@ -20,7 +20,9 @@ The manual GitHub Actions workflow `forge-on-demand.yml` is available through th
 - Unity: `apk`, `aab`, `web`, `linux`. A valid `UNITY_LICENSE` secret is required. AAB requires `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEYALIAS_NAME`, and `ANDROID_KEYALIAS_PASS` GitHub secrets, plus Custom Keystore enabled in Unity Player Settings.
 - Flutter: `test`, `apk`, `aab`; the existing pipeline is unchanged. Do not treat its current debug/unsigned test artifacts as store-ready releases.
 
-These workflow changes are committed but have not yet been exercised by a new Actions build. Builds remain gated by explicit user approval.
+Godot and Unity Web builds also publish an interactive browser preview to `https://majsjsj.github.io/FORGE-OS/game-preview/` using the same GitHub Pages site as the Studio. The preview deployment job runs only after the corresponding Web build artifact is created. In Claude, call `forge_game_preview_url` to confirm the latest published build; in Studio, use **OPEN LAST WEB GAME**. The preview is a browser/Web build, not an Android emulator.
+
+These workflow changes are committed but have not yet been exercised by a new Godot/Unity Actions build. Builds remain gated by explicit user approval.
 
 ## Local Builds
 - `forge build PATH apk`
