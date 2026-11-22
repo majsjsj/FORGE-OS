@@ -289,8 +289,15 @@ jobs:
           OUTPUT: ${{ inputs.output }}
         run: |
           mkdir -p "$PROJECT_PATH/build"
-          godot --headless --path "$PROJECT_PATH" --export-release "$OUTPUT" "$PROJECT_PATH/build/$OUTPUT"
-          test -e "$PROJECT_PATH/build/$OUTPUT"
+          if [ "$OUTPUT" = "web" ]; then
+            godot --headless --path "$PROJECT_PATH" --export-release "Web" "$PROJECT_PATH/build/web.zip"
+            mkdir -p "$PROJECT_PATH/build/web"
+            unzip -q "$PROJECT_PATH/build/web.zip" -d "$PROJECT_PATH/build/web"
+            test -s "$PROJECT_PATH/build/web/index.html"
+          else
+            godot --headless --path "$PROJECT_PATH" --export-release "Linux" "$PROJECT_PATH/build/linux.x86_64"
+            test -s "$PROJECT_PATH/build/linux.x86_64"
+          fi
       - uses: actions/upload-artifact@v4
         if: success() && (inputs.output == 'apk' || inputs.output == 'aab' || inputs.output == 'linux' || inputs.output == 'web')
         with:
