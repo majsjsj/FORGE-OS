@@ -297,7 +297,7 @@ jobs:
           export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
           export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
           export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
-          godot --headless --path "$PROJECT_PATH" --export-debug "Android" "$PROJECT_PATH/build/forge-android-debug.apk"
+          godot --headless --path "$PROJECT_PATH" --export-debug "Android" "build/forge-android-debug.apk"
           test -s "$PROJECT_PATH/build/forge-android-debug.apk"
       - name: Export signed Android App Bundle
         if: inputs.output == 'aab'
@@ -316,7 +316,7 @@ jobs:
           export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$GODOT_KEY_ALIAS"
           export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$GODOT_KEY_PASSWORD"
           mkdir -p "$PROJECT_PATH/build"
-          godot --headless --path "$PROJECT_PATH" --export-release "Android" "$PROJECT_PATH/build/forge-release.aab"
+          godot --headless --path "$PROJECT_PATH" --export-release "Android" "build/forge-release.aab"
           test -s "$PROJECT_PATH/build/forge-release.aab"
       - name: Export Web or Linux build
         if: inputs.output == 'linux' || inputs.output == 'web'
@@ -326,12 +326,12 @@ jobs:
         run: |
           mkdir -p "$PROJECT_PATH/build"
           if [ "$OUTPUT" = "web" ]; then
-            godot --headless --path "$PROJECT_PATH" --export-release "Web" "$PROJECT_PATH/build/web.zip"
+            godot --headless --path "$PROJECT_PATH" --export-release "Web" "build/web.zip"
             mkdir -p "$PROJECT_PATH/build/web"
             unzip -q "$PROJECT_PATH/build/web.zip" -d "$PROJECT_PATH/build/web"
             test -s "$PROJECT_PATH/build/web/index.html"
           else
-            godot --headless --path "$PROJECT_PATH" --export-release "Linux" "$PROJECT_PATH/build/linux.x86_64"
+            godot --headless --path "$PROJECT_PATH" --export-release "Linux" "build/linux.x86_64"
             test -s "$PROJECT_PATH/build/linux.x86_64"
           fi
       - uses: actions/upload-artifact@v4
