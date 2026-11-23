@@ -397,7 +397,7 @@ const TOOLS = [
   },
   {
     name: "forge_asset_import_batch",
-    description: "Stage up to 20 explicitly selected R2 assets into one isolated project branch commit before a build. Each file is limited to 16 MiB and the batch to 40 MiB total. Requires confirm=true; validates every path, rejects duplicate destinations and existing files, and commits all selected assets together or none. This is a manual pre-build staging step, not automatic build-time R2 access.",
+    description: "Stage up to 20 explicitly selected R2 assets into one isolated project branch commit before a build. Each file is limited to 16 MiB and the batch to 24 MiB total. Requires confirm=true; validates every path, rejects duplicate destinations and existing files, and commits all selected assets together or none. This is a manual pre-build staging step, not automatic build-time R2 access.",
     inputSchema: { type: "object", properties: {
       branch: { type: "string" },
       project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
