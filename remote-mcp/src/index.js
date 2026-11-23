@@ -785,7 +785,8 @@ const TOOLS = [
   },
 ];
 
-async function callTool(name, args, env) {\n  if (name === "forge_project_plan") return createSpecialistProjectPlan(args);
+async function callTool(name, args, env) {
+  if (name === "forge_project_plan") return createSpecialistProjectPlan(args);
   if (name === "forge_project_branch_create") {
     if (args.confirm !== true) throw new Error("Branch creation not performed: confirm=true is required after the user asks to create a project.");
     const branch = validateProjectBranch(args.branch);
