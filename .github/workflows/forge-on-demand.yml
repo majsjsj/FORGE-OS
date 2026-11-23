@@ -41,7 +41,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sync-assets:
+  sync_assets:
     if: inputs.sync_assets == true
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -148,8 +148,8 @@ jobs:
           retention-days: 1
 
   web:
-    needs: [sync-assets]
-    if: always() && inputs.engine == 'web' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'web' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -326,8 +326,8 @@ jobs:
           retention-days: 3
 
   flutter:
-    needs: [sync-assets]
-    if: always() && inputs.engine == 'flutter' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'flutter' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -531,8 +531,8 @@ jobs:
           retention-days: 3
 
   godot:
-    needs: [sync-assets]
-    if: always() && inputs.engine == 'godot' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'godot' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -793,8 +793,8 @@ jobs:
           retention-days: 3
 
   unity:
-    needs: [sync-assets]
-    if: always() && inputs.engine == 'unity' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'unity' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
