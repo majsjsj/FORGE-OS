@@ -2004,7 +2004,7 @@ export default {
       resources: [{
         uri: "ui://forge-os/live-preview.html",
         name: "FORGE-OS Live Preview",
-        description: "Sandboxed interactive preview for committed FORGE HTML projects.",
+        description: "Sandboxed interactive preview for committed HTML projects and deployed Godot/Unity Web builds.",
         mimeType: "text/html;profile=mcp-app",
         _meta: { ui: { csp: { connectDomains: ["https://forge-os-remote-mcp.majsjsj.workers.dev"] }, prefersBorder: false } }
       }]
