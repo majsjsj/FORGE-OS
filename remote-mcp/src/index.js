@@ -38,7 +38,7 @@ async function verifyGitHubActionsToken(token) {
       claims.workflow_ref !== OIDC_WORKFLOW_REF ||
       claims.workflow !== "FORGE On-Demand Engine Jobs" ||
       claims.sub !== "repo:majsjsj/FORGE-OS:ref:refs/heads/main" ||
-      typeof claims.run_id !== "string" || !/^\\d{1,20}$/.test(claims.run_id) ||
+      typeof claims.run_id !== "string" || !/^\d{1,20}$/.test(claims.run_id) ||
       typeof claims.sha !== "string" || !/^[a-f0-9]{40}$/i.test(claims.sha)) {
     throw new Error("GitHub OIDC token is not from the trusted FORGE workflow on main.");
   }
@@ -89,7 +89,7 @@ async function handleActionsAssetSync(request, env) {
           path === "forge-assets-manifest.json" || path.split("/").some(part =>
             !part || part === "." || part === ".." || part.startsWith(".") ||
             /secret|credential|service-account/i.test(part) ||
-            /\\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))) {
+            /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))) {
         throw new Error("One or more asset paths are unsafe or reserved.");
       }
       if (paths.has(path)) throw new Error("Duplicate asset path: " + path);
