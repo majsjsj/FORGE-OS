@@ -1,5 +1,6 @@
 const REPO = "majsjsj/FORGE-OS";
 const WORKFLOW = "forge-on-demand.yml";
+const TERMINAL_WORKFLOW = "forge-terminal.yml";
 const PROTOCOL_VERSION = "2025-03-26";
 
 function json(data, status = 200) {
@@ -198,6 +199,41 @@ const TOOLS = [
     name: "forge_game_preview_url",
     description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return the playable browser preview URL. Read-only; does not start a build.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "forge_terminal_run",
+    description: "Run one user-requested shell command inside the selected project directory on a fresh temporary GitHub-hosted runner. Requires confirm=true. Uses no repository secrets, read-only repository permission, no persisted checkout credentials, and a 180-second command limit. Changes made on the runner are temporary and are not committed. Never put passwords, API keys, or other secrets in the command because command text appears in logs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Existing forge/projects/ branch; main is not allowed." },
+        project_path: { type: "string", description: "Project directory, for example workspace/my-app." },
+        command: { type: "string", description: "Shell command to run in the project directory; maximum 4000 characters." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "project_path", "command", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_terminal_latest",
+    description: "Get the latest ephemeral terminal run status and URL.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "forge_terminal_details",
+    description: "Get status and job IDs for one ephemeral terminal run.",
+    inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false }
+  },
+  {
+    name: "forge_terminal_logs",
+    description: "Read the tail of logs for a job belonging to an ephemeral terminal run.",
+    inputSchema: {
+      type: "object",
+      properties: { run_id: { type: "integer" }, job_id: { type: "integer" } },
+      required: ["run_id", "job_id"],
+      additionalProperties: false
+    }
   },
   {
     name: "forge_health",
@@ -414,7 +450,7 @@ async function callTool(name, args, env) {
       file.path = validateWorkspacePath(file.path);
       if (seen.has(file.path)) throw new Error("Duplicate path in batch: " + file.path);
       seen.add(file.path);
-      if (typeof file.content !== "string" || file.content.includes("\\0"))
+      if (typeof file.content !== "string" || file.content.includes("\0"))
         throw new Error("Each file must contain valid UTF-8 text without NUL bytes.");
       const size = new TextEncoder().encode(file.content).length;
       if (size > 500000) throw new Error("Each file must be no larger than 500 KB: " + file.path);
@@ -495,6 +531,68 @@ async function callTool(name, args, env) {
         note: "This URL serves the latest successful Web build that completed the preview-site deployment. It is interactive in a browser; Android APK/AAB files are not browser previews." };
     }
     return { found: false, message: "No successful Godot or Unity Web build with a completed Pages deployment was found yet. Request an authorized Web build first." };
+  }
+
+  if (name === "forge_terminal_run") {
+    if (args.confirm !== true) throw new Error("Terminal command not started: confirm=true is required after the user explicitly requests execution.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main") throw new Error("Terminal execution requires an isolated forge/projects/ branch; main is not allowed.");
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory inside workspace/.");
+    if (typeof args.command !== "string" || !args.command.trim() || args.command.length > 4000 || args.command.includes("\0"))
+      throw new Error("command must be non-empty, contain no NUL bytes, and be no longer than 4000 characters.");
+    await branchHead(env, branch);
+    await github(env, `actions/workflows/${TERMINAL_WORKFLOW}/dispatches`, {
+      method: "POST",
+      body: JSON.stringify({ ref: branch, inputs: {
+        project_branch: branch, project_path: projectPath, command: args.command
+      } })
+    });
+    return { accepted: true, branch, project_path: projectPath, command_length: args.command.length,
+      command_timeout_seconds: 180, workflow: TERMINAL_WORKFLOW,
+      message: "GitHub accepted the ephemeral terminal request. Use forge_terminal_latest, then forge_terminal_details and forge_terminal_logs to inspect it. The runner is temporary; filesystem changes are discarded when it ends." };
+  }
+
+  if (name === "forge_terminal_latest") {
+    const data = await github(env, `actions/workflows/${TERMINAL_WORKFLOW}/runs?per_page=1`);
+    const run = data.workflow_runs?.[0];
+    if (!run) return { found: false, message: "No terminal runs found yet." };
+    return { found: true, run_id: run.id, status: run.status, conclusion: run.conclusion,
+      html_url: run.html_url, created_at: run.created_at, updated_at: run.updated_at,
+      branch: run.head_branch, head_sha: run.head_sha };
+  }
+
+  if (name === "forge_terminal_details") {
+    const runId = Number(args.run_id);
+    if (!Number.isSafeInteger(runId) || runId <= 0) throw new Error("Invalid run_id.");
+    const run = await github(env, `actions/runs/${runId}`);
+    if (run.path !== `.github/workflows/${TERMINAL_WORKFLOW}`)
+      throw new Error("This run was not created by the FORGE ephemeral terminal workflow.");
+    const jobs = await github(env, `actions/runs/${runId}/jobs?per_page=100`);
+    return { run: { id: run.id, status: run.status, conclusion: run.conclusion,
+      html_url: run.html_url, branch: run.head_branch, head_sha: run.head_sha },
+      jobs: (jobs.jobs || []).map(job => ({ id: job.id, name: job.name, status: job.status,
+        conclusion: job.conclusion, html_url: job.html_url,
+        steps: (job.steps || []).map(step => ({ name: step.name, status: step.status, conclusion: step.conclusion })) })) };
+  }
+
+  if (name === "forge_terminal_logs") {
+    const runId = Number(args.run_id), jobId = Number(args.job_id);
+    if (!Number.isSafeInteger(runId) || runId <= 0 || !Number.isSafeInteger(jobId) || jobId <= 0)
+      throw new Error("Invalid run_id or job_id.");
+    const run = await github(env, `actions/runs/${runId}`);
+    if (run.path !== `.github/workflows/${TERMINAL_WORKFLOW}`)
+      throw new Error("This run was not created by the FORGE ephemeral terminal workflow.");
+    const jobs = await github(env, `actions/runs/${runId}/jobs?per_page=100`);
+    if (!(jobs.jobs || []).some(job => job.id === jobId)) throw new Error("job_id does not belong to this terminal run.");
+    const response = await fetch(`https://api.github.com/repos/${REPO}/actions/jobs/${jobId}/logs`, {
+      headers: { "user-agent": "FORGE-OS-Remote-Controller/1.0",
+        "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json",
+        "x-github-api-version": "2022-11-28" }
+    });
+    if (!response.ok) throw new Error(`GitHub terminal logs API ${response.status}.`);
+    const logs = await response.text();
+    return { run_id: runId, job_id: jobId, truncated: logs.length > 16000, logs: logs.slice(-16000) };
   }
 
   if (name === "forge_health") {
@@ -671,8 +769,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.4.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.5.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run only for explicitly requested commands on that branch; terminal execution uses a temporary runner without repository secrets and discards filesystem changes; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});

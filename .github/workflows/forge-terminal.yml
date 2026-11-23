@@ -1,0 +1,72 @@
+name: FORGE Ephemeral Terminal
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_branch:
+        description: Isolated project branch to check out
+        required: true
+        type: string
+      project_path:
+        description: Project directory inside workspace/
+        required: true
+        type: string
+      command:
+        description: Shell command to execute inside the project directory (max 4000 chars)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-terminal-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout isolated project branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch }}
+          persist-credentials: false
+
+      - name: Validate project directory
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          raw = os.environ["PROJECT_PATH"]
+          p = Path(raw)
+          if p.is_absolute() or ".." in p.parts or not raw.startswith("workspace/"):
+              raise SystemExit("Unsafe project path: terminal commands must run inside workspace/<project>.")
+          resolved = (root / p).resolve()
+          if not resolved.is_relative_to(root) or not resolved.is_dir():
+              raise SystemExit("Project directory does not exist or resolves outside the checkout.")
+          print(f"Terminal workspace: {resolved.relative_to(root)}")
+          PY
+
+      - name: Execute command in temporary runner
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          COMMAND: ${{ inputs.command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_PATH"
+          printf 'FORGE ephemeral terminal\nBranch: %s\nDirectory: %s\n' "${GITHUB_REF_NAME}" "$PWD"
+          printf '\n$ %s\n\n' "$COMMAND"
+          set +e
+          timeout --signal=TERM --kill-after=5s 180s bash -lc "$COMMAND"
+          result=$?
+          set -e
+          if [ "$result" -eq 124 ] || [ "$result" -eq 137 ]; then
+            echo "::error::Terminal command exceeded the 180-second command limit."
+          fi
+          exit "$result"
