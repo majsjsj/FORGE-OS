@@ -52,8 +52,21 @@ async function verifyGitHubActionsToken(token) {
     githubOidcJwksCache = data.keys;
     githubOidcJwksFetchedAt = Date.now();
   }
-  const jwk = githubOidcJwksCache.find(key => key.kid === header.kid && key.kty === "RSA" && key.use === "sig");
-  if (!jwk) throw new Error("GitHub OIDC signing key ID was not found.");
+  let jwk = githubOidcJwksCache.find(key => key.kid === header.kid && key.kty === "RSA" && key.use === "sig");
+  if (!jwk) {
+    githubOidcJwksCache = null;
+    githubOidcJwksFetchedAt = 0;
+    const response = await fetch("https://token.actions.githubusercontent.com/.well-known/jwks", {
+      headers: { "accept": "application/json" }, cf: { cacheTtl: 0, cacheEverything: false }
+    });
+    if (!response.ok) throw new Error("Unable to refresh GitHub OIDC signing keys.");
+    const data = await response.json();
+    if (!Array.isArray(data.keys)) throw new Error("GitHub OIDC signing key set is invalid.");
+    githubOidcJwksCache = data.keys;
+    githubOidcJwksFetchedAt = Date.now();
+    jwk = githubOidcJwksCache.find(key => key.kid === header.kid && key.kty === "RSA" && key.use === "sig");
+  }
+  if (!jwk || (jwk.alg && jwk.alg !== "RS256")) throw new Error("GitHub OIDC signing key ID was not found or is not RS256.");
   const publicKey = await crypto.subtle.importKey("jwk", jwk,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey,
@@ -66,6 +79,8 @@ async function handleActionsAssetSync(request, env) {
   const authorization = request.headers.get("authorization") || "";
   if (!authorization.startsWith("Bearer ")) return json({ error: "GitHub OIDC bearer token required." }, 401);
   try {
+    if (Number(request.headers.get("content-length") || 0) > 16000)
+      return json({ error: "Asset sync request is too large." }, 413);
     const claims = await verifyGitHubActionsToken(authorization.slice(7));
     const body = await request.json();
     const bucket = env.FORGE_ASSETS_BUCKET;
@@ -73,7 +88,10 @@ async function handleActionsAssetSync(request, env) {
     const run = await github(env, "actions/runs/" + claims.run_id);
     if (run.id !== Number(claims.run_id) || run.event !== "workflow_dispatch" ||
         run.path !== ".github/workflows/" + WORKFLOW || run.head_branch !== "main" ||
-        run.head_sha !== claims.sha || run.status !== "in_progress") {
+        run.head_sha !== claims.sha || run.status !== "in_progress" ||
+        !/^\\d{1,20}$/.test(String(claims.run_attempt || "")) ||
+        run.run_attempt !== Number(claims.run_attempt) ||
+        claims.runner_environment !== "github-hosted") {
       throw new Error("The OIDC token does not match an active trusted FORGE workflow run.");
     }
     const branch = validateProjectBranch(body.project_branch);
