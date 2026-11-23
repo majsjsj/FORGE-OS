@@ -1,43 +1,57 @@
 # Chat-operated studio: implementation contract
 
 ## Goal
+
 Use Claude as the conversational interface while FORGE owns project structure, tool execution, verification, build orchestration, and artifact delivery. The user should not need Unity, Godot, Flutter, Android Studio, or a desktop IDE installed on their phone.
 
 ## Current verified boundary
-- The repository includes a local stdio MCP server and Claude Code configuration.
-- The on-demand GitHub Actions workflow supports Web checks, Flutter analyze/test plus unsigned APK/AAB builds, Godot headless import and configured Web/Linux exports, and Unity Linux builds gated by a license secret.
-- The mobile adapters can invoke Flutter, Gradle, Godot, and Unity when those toolchains are installed in the execution environment.
-- A project template or local adapter is not evidence of a successful cloud build.
-- The repository now contains a deployable single-owner Cloudflare Worker remote MCP controller and a manual deployment workflow. It is not live until the owner adds Cloudflare/GitHub repository secrets and runs that deployment workflow.
-- The controller can edit text files under workspace/, dispatch manual GitHub Actions builds, inspect runs, and return a public read-only interactive preview URL for committed HTML entry files under workspace/. It can also return the latest Godot/Unity Web build URL after the workflow successfully deploys that build to GitHub Pages. The preview gateway proxies only files from the public repository's main branch and supports relative assets and WebAssembly. It is not an arbitrary process runner, a multi-user workspace service, or a per-user secrets vault.
+
+- The static Studio includes Monaco editing, local browser drafts, sandboxed preview, and feature panels. Some feature panels remain lightweight MVP utilities; they must not be described as a full Android emulator, full Unity/Godot editor, unrestricted shell, or real performance profiler.
+- The remote MCP Worker provides authenticated, branch-aware project operations, short-lived terminal/cloud execution, build dispatch/status/logs, and artifact metadata/download links.
+- Project edits are isolated under `forge/projects/<name>`; direct writes to `main` are blocked. Branch comparison is available for review before a human merges changes.
+- GitHub Actions jobs are manually dispatched on temporary hosted runners for Web, Flutter, Godot 4.4.1, and Unity. Each engine has its own supported output and setup requirements documented in [on-demand environments](ON-DEMAND-ENVIRONMENTS.md).
+- R2 asset storage is optional. It keeps binary assets outside Git history, but build workflows do not yet synchronize those objects into project folders automatically.
+- A workflow definition, scaffold, or local adapter is not evidence of a successful cloud build or device test.
 
 ## Required architecture
 
 ### 1. Conversational control plane
-The first implementation is a single-owner Cloudflare Worker using stateless Streamable HTTP and a bearer token. It exposes workspace text-file operations, build dispatch, build status, logs, artifact metadata, and temporary signed ZIP download URLs. The owner must deploy it and connect it as a Claude custom connector; the local `.mcp.json` stdio entry remains useful for Claude Code. Multi-user OAuth and tenant identity mapping are not implemented.
+
+The deployed single-owner Cloudflare Worker uses stateless Streamable HTTP and bearer-token authentication. It exposes health, isolated branch management, workspace file operations, preview, terminal/cloud execution, build dispatch, status, logs, and artifact links. It is not a multi-user service; do not share its token or connect untrusted users.
 
 ### 2. Build plane
-Build jobs run in short-lived GitHub-hosted runners and check out committed project files from the repository's main branch. They return a run ID, logs, test summaries, and short-lived artifacts. The controller does not yet upload uncommitted browser drafts or create isolated per-project snapshots. Godot Android APK/AAB and Web export jobs are now defined; AAB requires the project's Gradle template, matching export preset, and secure signing secrets. Unity Android APK/AAB and WebGL jobs are now defined and require a valid Unity license; AAB also requires signing secrets. These workflow edits are not yet verified by a cloud build. Flutter APK/AAB builds are unsigned.
 
-### 3. Tenant isolation and secret vault
-Every user and project must have an authenticated tenant ID. Secret reads and writes must be authorized server-side for that tenant and project. Encrypt secrets at rest using a managed key or envelope-encryption design; redact values from logs; pass secrets to jobs only at runtime. Do not put credentials in Git, project prompts, ordinary chat, workflow artifacts, or public issue threads.
+Build jobs run in short-lived GitHub-hosted runners and check out the selected project branch. Web, Flutter, Godot, and Unity jobs are manual/on-demand. Artifacts have short retention. Builds must be explicitly authorized, and a dispatch is not a successful build until its run and outputs are inspected.
+
+### 3. External assets
+
+Optional Cloudflare R2 storage keeps large binary assets out of Git history and Actions artifacts. Uploads are explicitly confirmed and scoped to an isolated project branch/path. Build-time synchronization is not implemented yet. Any future integration must authenticate the runner using GitHub OIDC, verify repository/workflow/ref/run claims server-side, scope access to the selected branch/project, issue short-lived read-only access, and avoid passing long-lived secrets or bearer URLs through workflow inputs and logs.
+
+### 4. Tenant isolation and secret vault
+
+The current controller is single-owner. Multi-user operation requires authenticated tenant IDs, server-side authorization for every project/asset/secret, and encrypted per-tenant secret storage. Do not put credentials in Git, project prompts, ordinary chat, workflow artifacts, or public issue threads.
 
 Signing keys, passwords, AdMob account credentials, and payment-provider secrets require a secure upload/entry flow. Public AdMob app/ad unit IDs are configuration, not a substitute for protecting account credentials. Payment card data must remain with a compliant hosted checkout/provider; FORGE must not collect PAN or CVV.
 
-### 4. Approval policy
-Require explicit user confirmation before signing a release, publishing to a store, enabling live ads or payment flows, accessing external accounts, or using any service that may incur charges. Debug builds and test IDs are the default.
+### 5. Approval policy
 
-### 5. AI and quality
-Claude is the initial reasoning engine. Keep the model adapter interface provider-neutral so a future FORGE model can be added without changing studio workflows. Vision QA must use an actual vision-capable model for semantic inspection; pixel diffs are supplemental only. Automated repair must be bounded, test-driven, and report every attempt.
+Require explicit user confirmation before builds/tests that consume Actions quota, release signing, publishing to a store, enabling live ads or payment flows, accessing external accounts, or using any service that may incur charges. Debug/test configuration is the default. Never silently retry a failed build.
+
+### 6. AI and quality
+
+Keep the model adapter provider-neutral. Vision QA must use an actual vision-capable model for semantic inspection; pixel diffs are supplemental only. Automated repair must be bounded, test-driven, and report every attempt.
 
 ## Delivery gates
-1. Flutter cloud APK built, downloaded, installed, and smoke-tested.
-2. MCP remote control deployed; create/edit/test/build/status/artifact flow verified from a phone.
-3. Godot cloud Android APK and signed AAB export built and verified; Web export opened interactively through the preview gateway.
-4. Authenticated tenant isolation and encrypted secret vault tested with two separate users.
-5. Unity Android APK/AAB and WebGL export verified under a compliant license and a no-surprise-cost policy.
-6. Remote interactive preview tested on a phone with an HTML project and a Godot/Unity Web export.
-7. Release signing, ads, and payment integrations added only after secure secret entry and approval gates pass.
+
+1. Flutter cloud APK built, downloaded, installed, and smoke-tested on a physical device.
+2. Remote MCP create/edit/inspect/build/status/artifact flow verified from a phone.
+3. Godot Android APK and signed AAB exports built and verified; Web export opened interactively.
+4. Unity Android APK/AAB and WebGL exports verified under a compliant license.
+5. R2-to-build synchronization implemented and verified without exposing long-lived credentials or public bucket access.
+6. Authenticated tenant isolation and encrypted secret vault tested with separate users.
+7. Remote interactive preview tested on a phone with HTML and Godot/Unity Web exports.
+8. Release signing, ads, and payment integrations added only after secure secret entry and approval gates pass.
 
 ## Free-first constraints
-Keep the repository public and do not add a paid dependency or paid runner. Free quotas are limited and can change; the system must surface quota limits and fail closed rather than silently switching to paid infrastructure. No unlimited-free-build promise is made.
+
+Keep workflows manual and short-lived. GitHub Actions, Codespaces, and Cloudflare quotas are account-dependent and can change. The system must surface quota/cost implications and fail closed rather than silently switching to paid infrastructure. No unlimited-free-build promise is made.
