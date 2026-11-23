@@ -205,6 +205,35 @@ const TOOLS = [
     }
   },
   {
+    name: "forge_project_context_read",
+    description: "Read the project's persistent FORGE_CONTEXT.md notes from an isolated project branch. Use this at the start of a continuing project task to recover architecture, decisions, constraints, and TODOs. Read-only; does not expose repository secrets.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Project directory, for example workspace/my-app." },
+        branch: { type: "string", description: "Existing forge/projects/ branch." }
+      },
+      required: ["project_path", "branch"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_context_save",
+    description: "Create or update the project's persistent FORGE_CONTEXT.md notes on an isolated branch. Store architecture, decisions, constraints, setup, and TODOs only; never store passwords, tokens, private keys, or credentials. Requires confirm=true and expected_sha when updating an existing file. Does not run code or build.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Project directory, for example workspace/my-app." },
+        branch: { type: "string", description: "Existing forge/projects/ branch." },
+        content: { type: "string", description: "Project context notes in Markdown; maximum 256 KiB." },
+        expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+        confirm: { type: "boolean" }
+      },
+      required: ["project_path", "branch", "content", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_workspace_batch_write",
     description: "Atomically create or update up to 150 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
@@ -647,6 +676,39 @@ async function callTool(name, args, env) {
       scope: "project-directory-only",
       note: "Committed generated Studio files only; no code execution, tests, or build were started."
     };
+  }
+
+  if (name === "forge_project_context_read") {
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory below workspace/.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main" || !branch.startsWith("forge/projects/"))
+      throw new Error("Project context can only be read from a forge/projects/ branch.");
+    return await callTool("forge_workspace_read", {
+      path: projectPath + "/FORGE_CONTEXT.md",
+      branch
+    }, env);
+  }
+
+  if (name === "forge_project_context_save") {
+    if (args.confirm !== true) throw new Error("Project context was not saved: confirm=true is required.");
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory below workspace/.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main" || !branch.startsWith("forge/projects/"))
+      throw new Error("Project context can only be saved to a forge/projects/ branch.");
+    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 256 * 1024)
+      throw new Error("Project context must be UTF-8 text no larger than 256 KiB.");
+    if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(args.content) ||
+        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\s*[:=]\s*[^\s<>{}]{12,}/i.test(args.content))
+      throw new Error("Project context must not contain credential values. Record secret names/references only.");
+    return await callTool("forge_workspace_write", {
+      path: projectPath + "/FORGE_CONTEXT.md",
+      branch,
+      content: args.content,
+      ...(args.expected_sha ? { expected_sha: args.expected_sha } : {}),
+      confirm: true
+    }, env);
   }
 
   if (name === "forge_workspace_batch_write") {
