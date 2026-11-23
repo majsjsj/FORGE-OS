@@ -22,3 +22,5 @@ jobs:
         run: node --check workspace/blank-project/script.js
       - name: Check browser studio JavaScript
         run: node --check studio/studio.js
+      - name: Check remote MCP Worker JavaScript
+        run: node --check remote-mcp/src/index.js

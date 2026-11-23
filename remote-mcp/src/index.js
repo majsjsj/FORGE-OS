@@ -104,6 +104,33 @@ const TOOLS = [
     },
   },
   {
+    name: "forge_workspace_batch_write",
+    description: "Atomically create or update up to 40 UTF-8 project files in one Git commit. Requires confirm=true after the user asks for these edits. For every existing file, provide expected_sha from forge_workspace_read; new files must omit expected_sha. Rejects stale versions and never partially writes a batch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          minItems: 1,
+          maxItems: 40,
+          items: {
+            type: "object",
+            properties: {
+              path: { type: "string" },
+              content: { type: "string" },
+              expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }
+            },
+            required: ["path", "content"],
+            additionalProperties: false
+          }
+        },
+        confirm: { type: "boolean" }
+      },
+      required: ["files", "confirm"],
+      additionalProperties: false
+    },
+  },
+  {
     name: "forge_preview_url",
     description: "Return an interactive HTTPS preview URL for a committed HTML entry file inside workspace/. Relative JS, CSS, image, audio, and WebAssembly assets are served from the same project folder. This is a public read-only preview of the public repository; it does not start a build or consume Actions quota.",
     inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." } }, required: ["entry_file"], additionalProperties: false },
@@ -194,6 +221,71 @@ async function callTool(name, args, env) {
     const saved = await github(env, `contents/${path}`, { method: "PUT", body: JSON.stringify(payload) });
     return { saved: true, path: saved.content.path, sha: saved.content.sha,
       commit_sha: saved.commit.sha, html_url: saved.content.html_url };
+  }
+
+  if (name === "forge_workspace_batch_write") {
+    if (args.confirm !== true) throw new Error("Batch write not performed: confirm=true is required after the user asks for these project edits.");
+    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 40)
+      throw new Error("files must contain between 1 and 40 file entries.");
+    const seen = new Set();
+    let totalBytes = 0;
+    for (const file of args.files) {
+      if (!file || typeof file !== "object") throw new Error("Each file entry must be an object.");
+      file.path = validateWorkspacePath(file.path);
+      if (seen.has(file.path)) throw new Error("Duplicate path in batch: " + file.path);
+      seen.add(file.path);
+      if (typeof file.content !== "string" || file.content.includes("\\0"))
+        throw new Error("Each file must contain valid UTF-8 text without NUL bytes.");
+      const size = new TextEncoder().encode(file.content).length;
+      if (size > 500000) throw new Error("Each file must be no larger than 500 KB: " + file.path);
+      totalBytes += size;
+      if (file.expected_sha !== undefined && (typeof file.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(file.expected_sha)))
+        throw new Error("Invalid expected_sha for " + file.path);
+    }
+    if (totalBytes > 2000000) throw new Error("The complete batch must be no larger than 2 MB.");
+    const ref = await github(env, "git/ref/heads/main");
+    const parent = ref.object.sha;
+    const commit = await github(env, "git/commits/" + parent);
+    const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
+    if (tree.truncated) throw new Error("Repository tree is too large to safely validate this batch.");
+    const existing = new Map((tree.tree || []).filter(item => item.type === "blob").map(item => [item.path, item.sha]));
+    const entries = [];
+    for (const file of args.files) {
+      const currentSha = existing.get(file.path);
+      if (currentSha && !file.expected_sha)
+        throw new Error("Existing file requires expected_sha from forge_workspace_read: " + file.path);
+      if (currentSha && currentSha !== file.expected_sha)
+        throw new Error("Stale file version; read the latest file before updating: " + file.path);
+      if (!currentSha && file.expected_sha)
+        throw new Error("expected_sha was supplied for a file that does not exist: " + file.path);
+      const blob = await github(env, "git/blobs", {
+        method: "POST",
+        body: JSON.stringify({ content: file.content, encoding: "utf-8" })
+      });
+      entries.push({ path: file.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+    const nextTree = await github(env, "git/trees", {
+      method: "POST",
+      body: JSON.stringify({ base_tree: commit.tree.sha, tree: entries })
+    });
+    const nextCommit = await github(env, "git/commits", {
+      method: "POST",
+      body: JSON.stringify({ message: "FORGE: atomic project update (" + entries.length + " files)", tree: nextTree.sha, parents: [parent] })
+    });
+    await github(env, "git/refs/heads/main", {
+      method: "PATCH",
+      body: JSON.stringify({ sha: nextCommit.sha, force: false })
+    });
+    return {
+      saved: true,
+      atomic: true,
+      branch: "main",
+      files: entries.map(entry => ({ path: entry.path, sha: entry.sha })),
+      file_count: entries.length,
+      total_bytes: totalBytes,
+      commit_sha: nextCommit.sha,
+      commit_url: nextCommit.html_url
+    };
   }
 
   if (name === "forge_preview_url") {
@@ -393,8 +485,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.1.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must already be committed under workspace/. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.2.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Use forge_workspace_batch_write to atomically create/update related files in one commit; existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});

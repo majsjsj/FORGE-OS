@@ -6,7 +6,7 @@ This is the first remote-control layer for FORGE-OS. It is a stateless Streamabl
 
 - Authenticated MCP endpoint at `/mcp` using a dedicated bearer token.
 - Health check.
-- Read/list/create/update text files inside `workspace/` through GitHub Contents API commits.
+- Read/list/create/update text files inside `workspace/`; single-file writes use the Contents API, while `forge_workspace_batch_write` creates up to 40 related files in one atomic Git commit (2 MB total cap) with optimistic SHA checks.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
 - Latest build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
 - Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
@@ -49,8 +49,8 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 ## Use safely
 
 - First call `forge_health`.
-- Use `forge_workspace_list`, `forge_workspace_read`, and `forge_workspace_write` to create/edit files in `workspace/<project>`. Writes create commits on `main`; updates require the current blob SHA returned by read. Files must be text and no larger than 500 KB.
-- The controller does not yet sync uncommitted browser-editor drafts or create isolated branches per project.
+- Use `forge_workspace_list` and `forge_workspace_read` to inspect files. Use `forge_workspace_write` for one file or `forge_workspace_batch_write` for related files in one atomic commit. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Batch limit: 40 files, 500 KB per file, 2 MB total. All writes target `main`.
+- The controller does not yet sync uncommitted browser-editor drafts or create isolated branches per project. Multi-file writes are atomic, but project-level branch isolation and review/merge workflows remain future work.
 - Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
 - Poll `forge_latest_build` or inspect `forge_build_details`; retrieve logs with `forge_build_logs` if needed.
 - Use `forge_artifact_download` with an artifact ID from build details to obtain a temporary ZIP download link. Download links expire; artifacts are retained for only three days.
