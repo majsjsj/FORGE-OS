@@ -4,6 +4,133 @@ const TERMINAL_WORKFLOW = "forge-terminal.yml";
 const CLOUD_WORKFLOW = "forge-cloud-session.yml";
 const PROTOCOL_VERSION = "2025-03-26";
 
+const OIDC_AUDIENCE = "https://forge-os-remote-mcp.majsjsj.workers.dev";
+const OIDC_WORKFLOW_REF = "majsjsj/FORGE-OS/.github/workflows/forge-on-demand.yml@refs/heads/main";
+let githubOidcJwksCache = null;
+let githubOidcJwksFetchedAt = 0;
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, char => char.charCodeAt(0));
+}
+function decodeJwtJson(value) {
+  return JSON.parse(new TextDecoder().decode(decodeBase64Url(value)));
+}
+async function verifyGitHubActionsToken(token) {
+  if (typeof token !== "string" || token.length > 12000) throw new Error("Missing or oversized GitHub OIDC token.");
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("Malformed GitHub OIDC token.");
+  const header = decodeJwtJson(parts[0]);
+  const claims = decodeJwtJson(parts[1]);
+  if (header.alg !== "RS256" || typeof header.kid !== "string") throw new Error("Unsupported GitHub OIDC signing algorithm.");
+  const now = Math.floor(Date.now() / 1000);
+  if (claims.iss !== "https://token.actions.githubusercontent.com" ||
+      !(claims.aud === OIDC_AUDIENCE || (Array.isArray(claims.aud) && claims.aud.includes(OIDC_AUDIENCE))) ||
+      !Number.isSafeInteger(claims.exp) || claims.exp <= now ||
+      !Number.isSafeInteger(claims.nbf) || claims.nbf > now + 60 ||
+      !Number.isSafeInteger(claims.iat) || claims.iat > now + 60 || now - claims.iat > 900) {
+    throw new Error("GitHub OIDC issuer, audience, or token lifetime validation failed.");
+  }
+  if (claims.repository !== REPO || claims.event_name !== "workflow_dispatch" ||
+      claims.ref !== "refs/heads/main" || claims.ref_type !== "branch" ||
+      claims.workflow_ref !== OIDC_WORKFLOW_REF ||
+      claims.workflow !== "FORGE On-Demand Engine Jobs" ||
+      claims.sub !== "repo:majsjsj/FORGE-OS:ref:refs/heads/main" ||
+      typeof claims.run_id !== "string" || !/^\\d{1,20}$/.test(claims.run_id) ||
+      typeof claims.sha !== "string" || !/^[a-f0-9]{40}$/i.test(claims.sha)) {
+    throw new Error("GitHub OIDC token is not from the trusted FORGE workflow on main.");
+  }
+  if (!githubOidcJwksCache || Date.now() - githubOidcJwksFetchedAt > 10 * 60 * 1000) {
+    const response = await fetch("https://token.actions.githubusercontent.com/.well-known/jwks", {
+      headers: { "accept": "application/json" }, cf: { cacheTtl: 300, cacheEverything: true }
+    });
+    if (!response.ok) throw new Error("Unable to retrieve GitHub OIDC signing keys.");
+    const data = await response.json();
+    if (!Array.isArray(data.keys)) throw new Error("GitHub OIDC signing key set is invalid.");
+    githubOidcJwksCache = data.keys;
+    githubOidcJwksFetchedAt = Date.now();
+  }
+  const jwk = githubOidcJwksCache.find(key => key.kid === header.kid && key.kty === "RSA" && key.use === "sig");
+  if (!jwk) throw new Error("GitHub OIDC signing key ID was not found.");
+  const publicKey = await crypto.subtle.importKey("jwk", jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+  const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey,
+    decodeBase64Url(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]));
+  if (!valid) throw new Error("GitHub OIDC token signature is invalid.");
+  return claims;
+}
+async function handleActionsAssetSync(request, env) {
+  if (request.method !== "POST") return json({ error: "POST required." }, 405);
+  const authorization = request.headers.get("authorization") || "";
+  if (!authorization.startsWith("Bearer ")) return json({ error: "GitHub OIDC bearer token required." }, 401);
+  try {
+    const claims = await verifyGitHubActionsToken(authorization.slice(7));
+    const body = await request.json();
+    const bucket = env.FORGE_ASSETS_BUCKET;
+    if (!bucket || typeof bucket.get !== "function") throw new Error("External R2 asset storage is not configured.");
+    const run = await github(env, "actions/runs/" + claims.run_id);
+    if (run.id !== Number(claims.run_id) || run.event !== "workflow_dispatch" ||
+        run.path !== ".github/workflows/" + WORKFLOW || run.head_branch !== "main" ||
+        run.head_sha !== claims.sha || run.status !== "in_progress") {
+      throw new Error("The OIDC token does not match an active trusted FORGE workflow run.");
+    }
+    const branch = validateProjectBranch(body.project_branch);
+    if (branch === "main") throw new Error("R2 sync is allowed only for an isolated forge/projects/ branch.");
+    const project = validateWorkspacePath(body.project_path, true);
+    if (project === "workspace") throw new Error("Choose a project directory inside workspace/.");
+    if (!Array.isArray(body.asset_paths) || body.asset_paths.length < 1 || body.asset_paths.length > 20)
+      throw new Error("Select between 1 and 20 exact asset paths.");
+    const paths = new Set();
+    for (const path of body.asset_paths) {
+      if (typeof path !== "string" || !path || path.length > 240 ||
+          !/^[A-Za-z0-9._/-]+$/.test(path) || path.startsWith("/") || path.includes("\\\\") ||
+          path === "forge-assets-manifest.json" || path.split("/").some(part =>
+            !part || part === "." || part === ".." || part.startsWith(".") ||
+            /secret|credential|service-account/i.test(part) ||
+            /\\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))) {
+        throw new Error("One or more asset paths are unsafe or reserved.");
+      }
+      if (paths.has(path)) throw new Error("Duplicate asset path: " + path);
+      paths.add(path);
+    }
+    const secret = env.FORGE_ACCESS_TOKEN;
+    if (!secret || secret.length < 32) throw new Error("Asset URL signing is not configured.");
+    const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
+    const expires = Math.floor(Date.now() / 1000) + 300;
+    const encoder = new TextEncoder();
+    const signingKey = await crypto.subtle.importKey("raw", encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    let base = env.ASSET_BASE_URL || new URL("https://" + (env.WORKER_HOST || "forge-os-remote-mcp.majsjsj.workers.dev")).origin;
+    if (base.endsWith("/")) base = base.slice(0, -1);
+    const assets = [];
+    let totalBytes = 0;
+    for (const path of paths) {
+      const key = prefix + path;
+      const object = await bucket.get(key);
+      if (!object) throw new Error("Selected R2 asset was not found: " + path);
+      if (!Number.isSafeInteger(object.size) || object.size <= 0 || object.size > 16 * 1024 * 1024)
+        throw new Error("Each synchronized asset must be between 1 byte and 16 MiB: " + path);
+      totalBytes += object.size;
+      if (totalBytes > 24 * 1024 * 1024) throw new Error("One R2 sync batch is limited to 24 MiB total.");
+      const bytes = await object.arrayBuffer();
+      if (bytes.byteLength !== object.size) throw new Error("R2 object size changed while preparing: " + path);
+      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+      const sha256 = Array.from(digest).map(value => value.toString(16).padStart(2, "0")).join("");
+      const signature = Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", signingKey,
+        encoder.encode(key + "\\\\n" + expires)))).map(value => value.toString(16).padStart(2, "0")).join("");
+      const url = base + "/assets/" + key.split("/").map(encodeURIComponent).join("/") +
+        "?expires=" + expires + "&sig=" + signature;
+      assets.push({ path, size_bytes: object.size, sha256,
+        content_type: object.httpMetadata?.contentType || "application/octet-stream", download_url: url });
+    }
+    return json({ ok: true, branch, project_path: project, expires_at: new Date(expires * 1000).toISOString(), assets });
+  } catch (error) {
+    return json({ error: String(error?.message || error) }, 403);
+  }
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -1159,7 +1286,7 @@ async function callTool(name, args, env) {
     if (!allowed[engine].includes(output)) throw new Error(`Output ${output} is not supported for ${engine}.`);
     await github(env, `actions/workflows/${WORKFLOW}/dispatches`, {
       method: "POST",
-      body: JSON.stringify({ ref: branch, inputs: { engine, project_path, output, project_branch: branch } }),
+      body: JSON.stringify({ ref: "main", inputs: { engine, project_path, output, project_branch: branch } }),
     });
     return { accepted: true, engine, project_path, branch, output,
       message: "GitHub accepted the dispatch request. Query forge_latest_build after a short wait to obtain the run ID and status." };
@@ -1238,6 +1365,7 @@ async function callTool(name, args, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/actions/assets") return handleActionsAssetSync(request, env);
     if (url.pathname.startsWith("/assets/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
       const bucket = env.FORGE_ASSETS_BUCKET;
