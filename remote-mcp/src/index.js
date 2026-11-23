@@ -687,7 +687,7 @@ const TOOLS = [
   },
   {
     name: "forge_artifact_download",
-    description: "Create a temporary download URL for a ZIP artifact produced by a FORGE on-demand workflow run. The URL expires and the ZIP may contain the APK/AAB or web build.",
+    description: "Create a temporary download URL for a ZIP artifact produced by a FORGE on-demand workflow run. New release outputs include a signed GitHub attestation for forge-artifact-manifest.json; verify it after extracting the ZIP with gh attestation verify.",
     inputSchema: { type: "object", properties: { artifact_id: { type: "integer" } }, required: ["artifact_id"], additionalProperties: false },
   },
   {
@@ -1544,7 +1544,9 @@ async function callTool(name, args, env) {
     if (!downloadUrl || !downloadUrl.startsWith("https://")) throw new Error("GitHub did not provide a valid temporary download URL.");
     return { artifact_id: artifactId, name: artifact.name, download_url: downloadUrl,
       expires_at: artifact.expires_at, format: "zip",
-      note: "Temporary signed GitHub download URL. Download and extract the ZIP to access the build output." };
+      attestation_subject: "forge-artifact-manifest.json",
+      attestation_verification_command: "gh attestation verify forge-artifact-manifest.json --repo " + REPO,
+      note: "Temporary signed GitHub download URL. Download and extract the ZIP. For newly produced release outputs, verify the signed artifact manifest attestation with the supplied GitHub CLI command, then validate the files against the manifest SHA-256 entries. Test-only outputs are not attested." };
   }
 
   if (name === "forge_build_logs") {
