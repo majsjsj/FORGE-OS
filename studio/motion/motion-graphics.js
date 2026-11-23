@@ -1,0 +1,45 @@
+(()=>{"use strict";
+const $=id=>document.getElementById(id),KEY="forge-motion-project-v1";
+const canvas=$("mgCanvas"),ctx=canvas.getContext("2d");
+let raf=0,started=0,duration=12,recording=null,stream=null;
+const defaults={title:"THE FUTURE IS MOVING",subtitle:"Ideas transformed into impact",metric:"87%",label:"GROWTH THIS YEAR",data:"24,48,36,72,87,100",copy:"A clear story told through motion, data and design.",style:"neon",camera:"push",duration:12,accent:"#a994ff"};
+function state(){return {title:$("mgTitle").value,subtitle:$("mgSubtitle").value,metric:$("mgMetric").value,label:$("mgLabel").value,data:$("mgData").value,copy:$("mgCopy").value,style:$("mgStyle").value,camera:$("mgCamera").value,duration:Math.max(4,Math.min(60,Number($("mgDuration").value)||12)),accent:$("mgAccent").value};}
+function exportData(){return state();}
+function importData(s){if(!s)return;for(const [k,id] of Object.entries({title:"mgTitle",subtitle:"mgSubtitle",metric:"mgMetric",label:"mgLabel",data:"mgData",copy:"mgCopy",style:"mgStyle",camera:"mgCamera",duration:"mgDuration",accent:"mgAccent"}))if(s[k]!=null)$(id).value=s[k];draw(1);}
+window.ForgeMotionGraphics={exportData,importData};
+function save(){try{const p=JSON.parse(localStorage.getItem(KEY)||"{}");p.motionGraphics=state();localStorage.setItem(KEY,JSON.stringify(p));}catch(e){}}
+function rgba(hex,a){const n=parseInt(hex.slice(1),16);return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
+function ease(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+function draw(progress=0){const s=state(),w=canvas.width,h=canvas.height,t=Math.max(0,Math.min(1,progress)),e=ease(t),accent=s.accent;
+ctx.clearRect(0,0,w,h);let zoom=1,pan=0,tilt=0;
+if(s.camera==="push")zoom=1+.09*e;if(s.camera==="pull")zoom=1.09-.09*e;if(s.camera==="pan")pan=-90+180*e;if(s.camera==="drift"){pan=-55+110*e;tilt=-.018+.036*e;}
+ctx.save();ctx.translate(w/2+pan,h/2);ctx.rotate(tilt);ctx.scale(zoom,zoom);ctx.translate(-w/2,-h/2);
+const bg=ctx.createLinearGradient(0,0,w,h);bg.addColorStop(0,s.style==="minimal"?"#f3f2ee":"#101625");bg.addColorStop(1,s.style==="corporate"?"#172d43":s.style==="bold"?"#321a39":"#080d18");ctx.fillStyle=bg;ctx.fillRect(-100,-100,w+200,h+200);
+if(s.style==="tech"||s.style==="neon"){ctx.strokeStyle=rgba(accent,.12);ctx.lineWidth=1;for(let x=0;x<w;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}for(let y=0;y<h;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();}}
+const light=s.style==="minimal"?"#161b28":"#f4f6ff",muted=s.style==="minimal"?"#596274":"#9ba9c0";
+ctx.globalAlpha=Math.min(1,t*4);ctx.fillStyle=accent;ctx.fillRect(92,94,Math.max(12,70*e),6);
+ctx.font="700 18px Arial";ctx.fillStyle=muted;ctx.fillText("FORGE MOTION  /  VISUAL STORY",92,78);
+ctx.globalAlpha=Math.min(1,Math.max(0,(t-.08)*3));ctx.fillStyle=light;ctx.font="800 66px Arial";wrapText(ctx,s.title.toUpperCase(),92,205,690,76);
+ctx.font="26px Arial";ctx.fillStyle=muted;wrapText(ctx,s.subtitle,96,300,620,38);
+ctx.globalAlpha=Math.min(1,Math.max(0,(t-.2)*2.8));ctx.fillStyle=accent;ctx.font="900 104px Arial";ctx.fillText(s.metric,94,470);
+ctx.fillStyle=light;ctx.font="700 20px Arial";ctx.fillText(s.label.toUpperCase(),98,510);
+ctx.fillStyle=muted;ctx.font="18px Arial";wrapText(ctx,s.copy,96,570,570,27);
+const vals=s.data.split(",").map(x=>Number(x.trim())).filter(Number.isFinite).slice(0,10);const max=Math.max(1,...vals),baseX=780,baseY=555,chartW=390,chartH=300;
+ctx.strokeStyle=rgba(accent,.45);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(baseX,baseY-chartH);ctx.lineTo(baseX,baseY);ctx.lineTo(baseX+chartW,baseY);ctx.stroke();
+if(vals.length>1){const pts=vals.map((v,i)=>({x:baseX+i*(chartW/(vals.length-1)),y:baseY-(v/max)*chartH}));ctx.save();ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.lineTo(pts[pts.length-1].x,baseY);ctx.lineTo(pts[0].x,baseY);ctx.closePath();const fill=ctx.createLinearGradient(0,baseY-chartH,0,baseY);fill.addColorStop(0,rgba(accent,.35));fill.addColorStop(1,rgba(accent,0));ctx.fillStyle=fill;ctx.fill();ctx.restore();
+ctx.beginPath();pts.forEach((p,i)=>{const visible=Math.min(1,Math.max(0,(t-.22)*1.6)*vals.length-i);if(i===0)ctx.moveTo(p.x,p.y);else if(visible>0)ctx.lineTo(p.x,p.y);});ctx.strokeStyle=accent;ctx.lineWidth=6;ctx.lineJoin="round";ctx.lineCap="round";ctx.stroke();
+pts.forEach((p,i)=>{const k=Math.max(0,Math.min(1,(t-.25)*vals.length/1.3-i));if(k<=0)return;ctx.beginPath();ctx.arc(p.x,p.y,7*k,0,Math.PI*2);ctx.fillStyle=light;ctx.fill();ctx.beginPath();ctx.arc(p.x,p.y,13*k,0,Math.PI*2);ctx.strokeStyle=rgba(accent,.7);ctx.lineWidth=2;ctx.stroke();});}
+ctx.globalAlpha=Math.min(1,Math.max(0,(t-.45)*2));ctx.fillStyle=muted;ctx.font="14px Arial";ctx.fillText("DATA / PERFORMANCE",baseX,baseY+42);
+for(let i=0;i<18;i++){const x=(i*173+((t*260)%w))%w,y=(i*97)%h;ctx.fillStyle=rgba(accent,.25);ctx.beginPath();ctx.arc(x,y,2+(i%3),0,Math.PI*2);ctx.fill();}
+ctx.restore();ctx.globalAlpha=1;
+$("mgTime").textContent="00:"+String(Math.floor(t*s.duration)).padStart(2,"0")+" / 00:"+String(s.duration).padStart(2,"0");
+}
+function wrapText(c,text,x,y,maxWidth,lineHeight){const words=String(text||"").split(/\s+/);let line="",yy=y;for(const word of words){const test=line?line+" "+word:word;if(c.measureText(test).width>maxWidth&&line){c.fillText(line,x,yy);line=word;yy+=lineHeight;}else line=test;}if(line)c.fillText(line,x,yy);}
+function animate(record=false){cancelAnimationFrame(raf);duration=state().duration;started=performance.now();$("mgRenderState").textContent=record?"RECORDING":"PREVIEWING";const tick=now=>{const elapsed=(now-started)/1000,p=Math.min(1,elapsed/duration);draw(p);if(p<1){raf=requestAnimationFrame(tick);}else{$("mgRenderState").textContent=record?"FINALIZING":"PREVIEW COMPLETE";if(record&&recording&&recording.state!=="inactive")recording.stop();}};raf=requestAnimationFrame(tick);}
+function preview(){save();animate(false);}
+function renderVideo(){if(!canvas.captureStream||!window.MediaRecorder){$("mgStatus").textContent="This browser does not support canvas recording. Try a current desktop Chrome or Edge.";return;}if(recording&&recording.state!=="inactive")return;save();const mime=["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"].find(x=>MediaRecorder.isTypeSupported(x));if(!mime){$("mgStatus").textContent="No supported WebM recording format was found in this browser.";return;}stream=canvas.captureStream(30);const chunks=[];try{recording=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:8000000});}catch(e){$("mgStatus").textContent="Could not start browser recorder: "+e.message;stream.getTracks().forEach(t=>t.stop());return;}recording.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};recording.onerror=()=>{$("mgStatus").textContent="Browser recording failed.";};recording.onstop=()=>{const blob=new Blob(chunks,{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="forge-motion-graphics.webm";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);stream.getTracks().forEach(t=>t.stop());$("mgStatus").textContent="WebM render complete · "+(blob.size/1048576).toFixed(1)+" MB · saved locally."; $("mgRenderState").textContent="RENDER COMPLETE";};recording.start(250);animate(true);$("mgStatus").textContent="Recording the full animation in real time. Keep this tab open until rendering finishes.";}
+$("mgPreview").addEventListener("click",preview);$("mgRecord").addEventListener("click",renderVideo);
+["mgTitle","mgSubtitle","mgMetric","mgLabel","mgData","mgCopy","mgStyle","mgCamera","mgDuration","mgAccent"].forEach(id=>$(id).addEventListener("input",()=>{save();if(!raf)draw(1);}));
+document.querySelectorAll(".nav").forEach(b=>{if(b.dataset.panel==="graphics")b.addEventListener("click",()=>draw(1));});
+try{const p=JSON.parse(localStorage.getItem(KEY)||"null");if(p?.motionGraphics)importData(p.motionGraphics);else draw(1);}catch(e){draw(1);}
+})();
