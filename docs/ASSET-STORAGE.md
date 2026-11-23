@@ -16,7 +16,7 @@ If the binding is absent, the asset tools return a clear configuration error and
 
 - `forge_asset_upload`: upload one base64-encoded binary file to the selected project's external asset namespace. Requires `confirm=true`; maximum decoded size is 32 MiB per call.
 - `forge_asset_multipart_start`: create a resumable R2 multipart upload and return an `upload_id`.
-- `forge_asset_multipart_part`: upload one part (up to 10 MiB decoded) and return its `etag`. Use sequential part numbers starting at 1. R2 requires every non-final part to be at least 5 MiB; use 8 MiB parts for a safe default and a smaller final part if needed.
+- `forge_asset_multipart_part`: upload one part (up to 10 MiB decoded) and return its `etag`. Use sequential part numbers starting at 1. Set `is_last_part=true` only on the final part. R2 requires every non-final part to be at least 5 MiB; use 8 MiB parts for a safe default and a smaller final part if needed.
 - `forge_asset_multipart_complete`: finalize the object using the exact ordered part-number/etag pairs returned by the part tool.
 - `forge_asset_multipart_abort`: explicitly discard an incomplete upload.
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
