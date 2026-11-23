@@ -77,3 +77,8 @@ The MCP tool `forge_studio_artifact_save` commits Design Studio output, Game Lab
 ## Persistent per-project context
 
 The MCP tools `forge_project_context_read` and `forge_project_context_save` provide a small Markdown memory file at `workspace/<project>/FORGE_CONTEXT.md` on the isolated project branch. Agents should read it before continuing work and update it with confirmed architecture, user decisions, constraints, setup notes, and TODOs. Saves require explicit confirmation and the current file SHA for updates; the file is limited to 256 KiB and credential-like values/private keys are rejected. Do not store passwords, tokens, private keys, or other secrets in project context. This is repository-backed project documentation, not private model memory.
+
+
+## Specialist project orchestration
+
+The MCP tool `forge_project_plan` returns a dependency-ordered plan and role contracts for product, architecture, UX, platform engineering, QA, security, and release. It is a deterministic planning tool for the connected conversational model; it does not spawn independent models or execute project work. See [specialist planning and project orchestration](SPECIALIST-AGENTS.md) for the lifecycle and approval boundaries.
