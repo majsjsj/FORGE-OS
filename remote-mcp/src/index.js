@@ -89,7 +89,7 @@ async function handleActionsAssetSync(request, env) {
     if (run.id !== Number(claims.run_id) || run.event !== "workflow_dispatch" ||
         run.path !== ".github/workflows/" + WORKFLOW || run.head_branch !== "main" ||
         run.head_sha !== claims.sha || run.status !== "in_progress" ||
-        !/^\\d{1,20}$/.test(String(claims.run_attempt || "")) ||
+        !/^\d{1,20}$/.test(String(claims.run_attempt || "")) ||
         run.run_attempt !== Number(claims.run_attempt) ||
         claims.runner_environment !== "github-hosted") {
       throw new Error("The OIDC token does not match an active trusted FORGE workflow run.");
