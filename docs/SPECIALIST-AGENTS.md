@@ -47,3 +47,10 @@ The planner is deterministic and intentionally bounded:
 ## Scope of this implementation
 
 The specialist planner and persistent task tracker are real MCP tools with input validation and automated tests. Plans and task history are stored as ordinary project JSON on the isolated branch, with optimistic concurrency and credential-like value rejection. Specialist roles are handoff contracts for the conversational model; they are not separate model instances and do not run in the background. Scheduled automation, autonomous background agents, cross-user memory, and multi-tenant secret storage are not part of this feature.
+
+
+## Read-only task monitoring checkpoints
+
+The MCP tool `forge_project_task_monitor` reads the saved plan and classifies tasks as ready, in progress, blocked by unfinished dependencies, or completed. It returns counts, each task's unmet dependencies, the current plan SHA, and a suggested next action. It is safe to call after a task update or at any manual project checkpoint; it does not write files, change statuses, execute specialist work, run tests, dispatch builds, or schedule background jobs.
+
+This is deliberately an on-demand monitor, not an autonomous event listener. No GitHub Actions schedule, Cloudflare Cron Trigger, webhook subscription, or recurring polling has been enabled. Those mechanisms can consume quotas or create unattended activity and must be designed and explicitly enabled separately.
