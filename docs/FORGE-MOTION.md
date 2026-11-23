@@ -1,6 +1,6 @@
 # FORGE MOTION — production architecture and current status
 
-## Implemented browser-side post-production milestone
+## Implemented browser-side motion graphics milestone\n\n- Dedicated motion graphics panel with editable title, subtitle, metric, supporting copy, chart values, visual template, accent color and virtual camera move.\n- Canvas animation renders animated typography, infographic line chart, data points, grid/particles and camera push, pull, pan, drift or static framing.\n- Preview animation and real-time local WebM recording through the browser MediaRecorder API, with a 30 fps canvas stream.\n- Motion graphics settings are persisted with the project and included in JSON project import/export.\n- This browser renderer exports WebM video only; it does not yet mux audio, encode MP4, or provide a full multitrack editor.\n\n## Implemented browser-side post-production milestone
 
 - Local rendered-video preview (user selects a video file; no upload).
 - Optional external audio track with play/pause/seek synchronization against preview time.
@@ -29,4 +29,4 @@ Subtitle cue timing follows the media player's playback clock. Imported SRT/VTT 
 
 ## Not yet implemented or verified
 
-The UI does not itself provide AI transcription, generated video, Blender rendering, 2D/3D character animation, a multitrack compositor, or final MP4 export. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
+The UI does not itself provide AI transcription, generated video, Blender rendering, 2D/3D character animation, a multitrack compositor, audio-mixed final export, or final MP4 export. The motion-graphics canvas is a real local 2D renderer with WebM recording, not an AI video generator or 3D engine. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
