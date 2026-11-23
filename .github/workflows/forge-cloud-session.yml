@@ -1,0 +1,215 @@
+name: FORGE Cloud Execution Session
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_branch:
+        description: Isolated project branch to check out
+        required: true
+        type: string
+      project_path:
+        description: Project directory inside workspace/
+        required: true
+        type: string
+      command:
+        description: Setup, test, or project command (max 8000 chars)
+        required: true
+        type: string
+      save_changes:
+        description: Commit changes made by this session back to the same project branch
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-cloud-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Validate branch and project directory
+        env:
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          branch = os.environ["PROJECT_BRANCH"]
+          raw = os.environ["PROJECT_PATH"]
+          p = Path(raw)
+          if not branch.startswith("forge/projects/") or ".." in branch or "//" in branch:
+              raise SystemExit("Cloud sessions require an isolated forge/projects/ branch.")
+          if p.is_absolute() or ".." in p.parts or not raw.startswith("workspace/") or raw == "workspace":
+              raise SystemExit("Unsafe project path: sessions are restricted to workspace/<project>.")
+          PY
+
+      - name: Checkout isolated project branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch }}
+          persist-credentials: false
+
+      - name: Verify project directory
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          resolved = (root / os.environ["PROJECT_PATH"]).resolve()
+          if not resolved.is_relative_to(root) or not resolved.is_dir():
+              raise SystemExit("Project directory does not exist or resolves outside the checkout.")
+          print(f"Cloud workspace ready: {resolved.relative_to(root)}")
+          PY
+
+      - name: Execute in isolated cloud workspace
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          COMMAND: ${{ inputs.command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_PATH"
+          printf 'FORGE Cloud Execution Session\nBranch: %s\nProject: %s\n' "$GITHUB_REF_NAME" "$PROJECT_PATH"
+          printf '\n$ %s\n\n' "$COMMAND"
+          timeout --signal=TERM --kill-after=10s 600s bash -lc "$COMMAND"
+
+      - name: Package safe project delta
+        if: ${{ inputs.save_changes }}
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          project = (root / os.environ["PROJECT_PATH"]).resolve()
+          if not project.is_relative_to(root) or not project.is_dir():
+              raise SystemExit("Project path escaped the checkout.")
+          blocked_names = {".git", ".github", ".claude", ".npmrc", ".pypirc", "key.properties",
+                           "keystore.properties", "id_rsa", "id_ed25519"}
+          blocked_suffixes = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".mobileprovision"}
+          files = []
+          total = 0
+          stage = Path(os.environ["RUNNER_TEMP"]) / "forge-cloud-delta"
+          payload = stage / "files"
+          payload.mkdir(parents=True, exist_ok=True)
+          for current, dirs, names in os.walk(project, followlinks=False):
+              base = Path(current)
+              for name in list(dirs):
+                  p = base / name
+                  if p.is_symlink() or name in blocked_names:
+                      raise SystemExit(f"Unsafe directory in project delta: {p.relative_to(root)}")
+              for name in names:
+                  src = base / name
+                  rel = src.relative_to(root).as_posix()
+                  parts = src.relative_to(root).parts
+                  low = name.lower()
+                  if src.is_symlink() or any(part in blocked_names for part in parts) or low.startswith(".env") or low.endswith(tuple(blocked_suffixes)) or "secret" in low or "credential" in low or low.startswith("service-account"):
+                      raise SystemExit(f"Refusing to save a symlink or credential-like file: {rel}")
+                  size = src.stat().st_size
+                  total += size
+                  files.append(rel)
+                  if len(files) > 200 or total > 50000000:
+                      raise SystemExit("Save limit reached: maximum 200 files and 50 MB per cloud session.")
+                  dest = payload / rel
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  dest.write_bytes(src.read_bytes())
+          tracked = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", "HEAD", "--", os.environ["PROJECT_PATH"]], text=True).splitlines()
+          deleted = sorted(set(tracked) - set(files))
+          (stage / "manifest.json").write_text(json.dumps({
+              "project_path": os.environ["PROJECT_PATH"],
+              "files": sorted(files),
+              "deleted": deleted,
+              "file_count": len(files),
+              "total_bytes": total
+          }))
+          print(f"Prepared {len(files)} project files ({total} bytes), {len(deleted)} deletions.")
+          PY
+
+      - name: Upload project delta for isolated save job
+        if: ${{ inputs.save_changes }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-cloud-delta
+          path: ${{ runner.temp }}/forge-cloud-delta/
+          if-no-files-found: error
+          retention-days: 1
+          include-hidden-files: true
+
+      - name: Report discarded changes when save is disabled
+        if: ${{ !inputs.save_changes }}
+        run: echo "Save disabled. All runner filesystem changes will be discarded when this session ends."
+
+  save:
+    if: ${{ inputs.save_changes }}
+    needs: execute
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download untrusted project data artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-cloud-delta
+          path: forge-cloud-delta
+
+      - name: Commit project delta using GitHub API (no project code execution)
+        uses: actions/github-script@v7
+        env:
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const root = path.resolve('forge-cloud-delta');
+            const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+            const project = manifest.project_path;
+            if (!project.startsWith('workspace/') || project === 'workspace' || project.includes('..'))
+              throw new Error('Invalid project path in delta manifest.');
+            const branch = process.env.PROJECT_BRANCH;
+            if (!branch.startsWith('forge/projects/') || branch.includes('..'))
+              throw new Error('Invalid isolated project branch.');
+            if (manifest.files.length > 200 || manifest.total_bytes > 50000000)
+              throw new Error('Project delta exceeds the 200-file / 50-MB save limit.');
+            const blocked = p => p.split('/').some(part => ['.git','.github','.claude','.npmrc','.pypirc','key.properties','keystore.properties','id_rsa','id_ed25519'].includes(part.toLowerCase())) ||
+              p.split('/').some(part => /^\.env/i.test(part)) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(p) ||
+              /secret|credential|service-account/i.test(path.basename(p));
+            const ref = await github.rest.git.getRef({owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/' + branch});
+            const parentSha = ref.data.object.sha;
+            const parent = await github.rest.git.getCommit({owner: context.repo.owner, repo: context.repo.repo, commit_sha: parentSha});
+            const tree = [];
+            for (const rel of manifest.files) {
+              if (typeof rel !== 'string' || !rel.startsWith(project + '/') || rel.includes('..') || blocked(rel))
+                throw new Error('Unsafe file path in project delta.');
+              const file = path.resolve(root, 'files', rel);
+              if (!file.startsWith(path.resolve(root, 'files') + path.sep))
+                throw new Error('Project delta path traversal detected.');
+              const data = fs.readFileSync(file);
+              const blob = await github.rest.git.createBlob({owner: context.repo.owner, repo: context.repo.repo, content: data.toString('base64'), encoding: 'base64'});
+              tree.push({path: rel, mode: '100644', type: 'blob', sha: blob.data.sha});
+            }
+            for (const rel of manifest.deleted || []) {
+              if (typeof rel !== 'string' || !rel.startsWith(project + '/') || rel.includes('..') || blocked(rel))
+                throw new Error('Unsafe deletion path in project delta.');
+              tree.push({path: rel, mode: '100644', type: 'blob', sha: null});
+            }
+            if (!tree.length) {
+              core.info('No project changes to save.');
+              return;
+            }
+            const nextTree = await github.rest.git.createTree({owner: context.repo.owner, repo: context.repo.repo, base_tree: parent.data.tree.sha, tree});
+            const commit = await github.rest.git.createCommit({owner: context.repo.owner, repo: context.repo.repo, message: 'FORGE: save cloud session changes', tree: nextTree.data.sha, parents: [parentSha]});
+            await github.rest.git.updateRef({owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/' + branch, sha: commit.data.sha, force: false});
+            core.info('Saved ' + manifest.file_count + ' project files and ' + (manifest.deleted || []).length + ' deletions to ' + branch + '.');
