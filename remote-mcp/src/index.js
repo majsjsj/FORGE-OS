@@ -1038,8 +1038,8 @@ async function callTool(name, args, env) {
         body: JSON.stringify({ sha: nextCommit.sha, force: false })
       });
       return { imported: true, atomic_commit: true, branch, project_path: project, files: staged.map(item => ({
-        asset_path: item.asset_path, destination: item.destination, size_bytes: item.bytes, content_type: item.content_type
-      })), file_count: staged.length, total_size_bytes: totalBytes, commit_sha: nextCommit.sha,
+        asset_path: item.asset_path, destination: item.destination, size_bytes: item.bytes, sha256: item.sha256, content_type: item.content_type
+      })), manifest_path: manifestPath, file_count: staged.length, total_size_bytes: totalBytes, commit_sha: nextCommit.sha,
         commit_url: nextCommit.html_url,
         note: "All selected assets were committed together to the isolated project branch. The next explicitly authorized build can package these files; no build was started." };
     }
