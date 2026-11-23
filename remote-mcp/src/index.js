@@ -979,13 +979,13 @@ async function callTool(name, args, env) {
         if (!bytes.length || bytes.length > 16 * 1024 * 1024)
           throw new Error("Each imported asset must be non-empty and no larger than 16 MiB: " + item.asset_path);
         totalBytes += bytes.length;
-        if (totalBytes > 40 * 1024 * 1024)
-          throw new Error("The selected batch exceeds the 40 MiB total limit; no project commit was created.");
+        if (totalBytes > 24 * 1024 * 1024)
+          throw new Error("The selected batch exceeds the 24 MiB total limit; no project commit was created.");
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000)
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
         staged.push({ ...item, bytes: bytes.length, content_type: object.httpMetadata?.contentType || "application/octet-stream",
-          binary, sha: null });
+          binary });
       }
       const treeEntries = [];
       for (const item of staged) {
