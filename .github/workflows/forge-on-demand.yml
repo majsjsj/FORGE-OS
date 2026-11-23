@@ -18,6 +18,11 @@ on:
         type: choice
         options: [test, apk, aab, web, linux]
         default: test
+      project_branch:
+        description: Isolated project branch (defaults to the dispatch ref)
+        required: false
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -35,6 +40,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - name: Validate project path
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
