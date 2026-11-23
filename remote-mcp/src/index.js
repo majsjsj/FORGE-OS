@@ -283,7 +283,90 @@ async function github(env, path, options = {}) {
   return response.json();
 }
 
+function createSpecialistProjectPlan(args) {
+  const brief = typeof args.brief === "string" ? args.brief.trim().replace(/\\s+/g, " ") : "";
+  if (brief.length < 8) throw new Error("Project brief must contain at least 8 characters.");
+  if (brief.length > 12000) throw new Error("Project brief exceeds the 12000-character limit.");
+  const allowedTypes = ["auto", "web", "android", "flutter", "godot", "unity", "game", "api", "desktop"];
+  let projectType = typeof args.project_type === "string" ? args.project_type : "auto";
+  if (!allowedTypes.includes(projectType)) throw new Error("Unsupported project_type. Choose auto, web, android, flutter, godot, unity, game, api, or desktop.");
+  if (projectType === "auto") {
+    const text = brief.toLowerCase();
+    if (/\\b(unity|c#)\\b/.test(text)) projectType = "unity";
+    else if (/\\bgodot\\b/.test(text)) projectType = "godot";
+    else if (/\\bflutter\\b/.test(text)) projectType = "flutter";
+    else if (/\\b(android|apk|aab)\\b/.test(text)) projectType = "android";
+    else if (/\\b(game|3d|2d)\\b/.test(text)) projectType = "game";
+    else if (/\\b(api|backend|service)\\b/.test(text)) projectType = "api";
+    else projectType = "web";
+  }
+  const engine = ({
+    web: "Web application engineer",
+    android: "Android application engineer",
+    flutter: "Flutter engineer",
+    godot: "Godot game engineer",
+    unity: "Unity game engineer",
+    game: "Game systems engineer",
+    api: "Backend and API engineer",
+    desktop: "Desktop application engineer"
+  })[projectType];
+  const agents = [
+    { id: "product", title: "Product analyst", mission: "Turn the brief into user stories, scope, assumptions, and measurable acceptance criteria.", boundaries: ["Do not invent missing business rules; record questions and assumptions."] },
+    { id: "architect", title: "Solution architect", mission: "Choose a maintainable architecture, data model, module boundaries, and platform strategy.", boundaries: ["Prefer existing repository conventions and supported engines.", "Do not add paid services or credentials without explicit approval."] },
+    { id: "designer", title: "UX and visual design specialist", mission: "Define information architecture, interaction flows, accessibility, visual identity, and responsive states.", boundaries: ["Do not substitute a generic template for the requested product identity."] },
+    { id: "engineer", title: engine, mission: "Implement the smallest complete vertical slice, then expand in reviewable increments.", boundaries: ["Work only on the selected isolated project branch.", "Read existing project context before changing files."] },
+    { id: "qa", title: "QA and test engineer", mission: "Create risk-based tests, validate edge cases, inspect outputs, and report untested areas.", boundaries: ["Never claim a device, browser, or engine test ran unless its result is available."] },
+    { id: "security", title: "Security reviewer", mission: "Review input validation, permissions, dependency exposure, secrets, and unsafe file operations.", boundaries: ["Never place tokens, passwords, private keys, or signing secrets in source or project memory."] },
+    { id: "release", title: "Release and delivery specialist", mission: "Prepare versioning, icons, metadata, release notes, signing requirements, and delivery checklist.", boundaries: ["No build, signing, publishing, external account access, or paid service activation without separate approval."] }
+  ];
+  const tasks = [
+    { id: "P1", agent: "product", title: "Clarify product scope", depends_on: [], deliverables: ["User stories", "Functional and non-functional requirements", "Open questions and explicit assumptions"], acceptance: ["Every core user journey has a measurable acceptance criterion.", "Out-of-scope work is recorded."] },
+    { id: "P2", agent: "architect", title: "Design the technical foundation", depends_on: ["P1"], deliverables: ["Architecture decision record", "Data and module boundaries", "Platform and dependency choices"], acceptance: ["Choices match the requested platform and repository constraints.", "No unapproved paid dependency or external service is introduced."] },
+    { id: "P3", agent: "designer", title: "Create the product experience", depends_on: ["P1", "P2"], deliverables: ["Screen and interaction map", "Visual system and responsive states", "Accessibility requirements"], acceptance: ["Primary flows and empty, loading, and error states are covered.", "Visual identity reflects the brief rather than a generic scaffold."] },
+    { id: "P4", agent: "engineer", title: "Implement a complete vertical slice", depends_on: ["P2", "P3"], deliverables: ["Working core flow", "Readable source modules", "Setup and configuration notes"], acceptance: ["The core flow is implemented in the selected project branch.", "Existing project files are read before guarded updates."] },
+    { id: "P5", agent: "qa", title: "Verify behavior and quality", depends_on: ["P4"], deliverables: ["Automated tests", "Static and structural checks", "Defect and limitation report"], acceptance: ["Relevant tests pass or failures are clearly reported.", "No test or device result is fabricated."] },
+    { id: "P6", agent: "security", title: "Review security and privacy", depends_on: ["P4"], deliverables: ["Threat and permission review", "Secret and input-handling review", "Remediation list"], acceptance: ["No credentials are committed.", "High-risk findings are fixed or explicitly documented."] },
+    { id: "P7", agent: "release", title: "Prepare delivery readiness", depends_on: ["P5", "P6"], deliverables: ["Release checklist", "Version and store metadata", "Build and signing prerequisites"], acceptance: ["Known blockers and unverified requirements are explicit.", "Build, signing, publishing, and paid actions remain approval-gated."] }
+  ];
+  return {
+    schema_version: 1,
+    project_type: projectType,
+    brief,
+    orchestration_mode: "model-directed specialist handoffs",
+    agents,
+    tasks,
+    execution_policy: {
+      read_project_context_first: true,
+      isolated_project_branch_required: true,
+      confirm_before_file_writes: true,
+      confirm_builds_and_tests_that_consume_quota: true,
+      confirm_signing_publishing_external_accounts_and_paid_services: true,
+      automatic_retries: false,
+      secrets_in_project_memory_or_source: false
+    },
+    limitations: [
+      "This tool creates a plan and specialist handoff contracts; it does not spawn independent AI models or execute tasks.",
+      "The connected conversational model performs the specialist reasoning using these role definitions and the available FORGE tools.",
+      "The plan is not saved automatically; save approved project decisions with forge_project_context_save."
+    ]
+  };
+}
+
 const TOOLS = [
+  {
+    name: "forge_project_plan",
+    description: "Create a structured project plan with specialist handoffs for product, architecture, UX, platform engineering, QA, security, and release. Planning only: does not spawn other AI models, write files, run commands, dispatch builds, or call paid services.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        brief: { type: "string", description: "User-approved project brief, 8 to 12000 characters." },
+        project_type: { type: "string", enum: ["auto", "web", "android", "flutter", "godot", "unity", "game", "api", "desktop"], description: "Project platform; auto detects a likely type from the brief." }
+      },
+      required: ["brief"],
+      additionalProperties: false
+    }
+  },
+
   {
     name: "forge_project_branch_create",
     description: "Create an isolated project branch under forge/projects/ from main or another project branch. Does not modify main. Requires confirm=true after the user asks to create a project.",
@@ -702,7 +785,7 @@ const TOOLS = [
   },
 ];
 
-async function callTool(name, args, env) {
+async function callTool(name, args, env) {\n  if (name === "forge_project_plan") return createSpecialistProjectPlan(args);
   if (name === "forge_project_branch_create") {
     if (args.confirm !== true) throw new Error("Branch creation not performed: confirm=true is required after the user asks to create a project.");
     const branch = validateProjectBranch(args.branch);
