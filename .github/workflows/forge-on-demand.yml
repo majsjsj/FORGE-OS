@@ -1124,7 +1124,7 @@ jobs:
           subject-path: ${{ runner.temp }}/forge-artifact/forge-artifact-manifest.json
       - name: Publish attestation verification details
         env:
-          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
+          ATTESTATION_URL: ${{ steps.attest.outputs['attestation-url'] }}
           ENGINE: ${{ inputs.engine }}
           OUTPUT: ${{ inputs.output }}
         run: |
