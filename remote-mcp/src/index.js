@@ -337,6 +337,20 @@ const TOOLS = [
     }
   },
   {
+    name: "forge_project_backup_delete",
+    description: "Delete one exact backup ref for an isolated project. This is destructive and requires confirm=true; it never deletes the live project branch.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Project branch that owns the backup." },
+        backup_branch: { type: "string", description: "Exact backup_branch returned by forge_project_backup_list." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "backup_branch", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_project_backup_restore",
     description: "Restore a selected project backup into a NEW isolated forge/projects/ branch. Never overwrites or rewinds the original branch. Requires confirm=true.",
     inputSchema: {
@@ -743,7 +757,7 @@ async function callTool(name, args, env) {
     const refs = await github(env, "git/matching-refs/heads/" + prefix);
     const existing = (refs || []).filter(item => typeof item.ref === "string" && item.ref.startsWith("refs/heads/" + prefix));
     if (existing.length >= 25) throw new Error("This project already has 25 backups. Review old snapshots before creating another.");
-    const backupBranch = prefix + Date.now() + "-" + currentSha.slice(0, 8);
+    const backupBranch = prefix + Date.now() + "-" + crypto.randomUUID().replace(/-/g, "").slice(0, 8);
     await ensureBranchAbsent(env, backupBranch);
     const created = await github(env, "git/refs", {
       method: "POST",
@@ -762,6 +776,17 @@ async function callTool(name, args, env) {
     await branchHead(env, projectBranch);
     const backups = await listProjectBackups(env, projectBranch);
     return { project_branch: projectBranch, count: backups.length, max_backups: 25, backups };
+  }
+
+  if (name === "forge_project_backup_delete") {
+    if (args.confirm !== true) throw new Error("Backup deletion not performed: confirm=true is required after the user selects the exact snapshot to delete.");
+    const projectBranch = validateProjectBranch(args.branch);
+    if (projectBranch === "main") throw new Error("Backup deletion requires the owning isolated project branch.");
+    const prefix = await projectBackupPrefix(projectBranch);
+    const backupBranch = validateProjectBackupBranch(args.backup_branch, prefix);
+    await github(env, "git/refs/heads/" + backupBranch, { method: "DELETE" });
+    return { deleted: true, project_branch: projectBranch, backup_branch: backupBranch,
+      note: "Only the selected backup ref was deleted. The live project branch was not changed." };
   }
 
   if (name === "forge_project_backup_restore") {
