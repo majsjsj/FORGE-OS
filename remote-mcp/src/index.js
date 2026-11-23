@@ -177,6 +177,34 @@ const TOOLS = [
     }
   },
   {
+    name: "forge_studio_artifact_save",
+    description: "Save generated FORGE Design Studio files or a Game Lab level JSON into one existing isolated project directory and branch. Paths must stay inside project_path. Requires confirm=true; never writes main. Existing files require expected_sha from forge_workspace_read. This only commits text files; it does not run tests or build.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Existing project directory, for example workspace/my-app." },
+        branch: { type: "string", description: "Existing forge/projects/ branch." },
+        artifact_kind: { type: "string", enum: ["design", "game_level", "project_files"] },
+        files: {
+          type: "array", minItems: 1, maxItems: 20,
+          items: {
+            type: "object",
+            properties: {
+              path: { type: "string", description: "Full path under project_path, for example workspace/my-app/src/generated.css." },
+              content: { type: "string" },
+              expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" }
+            },
+            required: ["path", "content"],
+            additionalProperties: false
+          }
+        },
+        confirm: { type: "boolean" }
+      },
+      required: ["project_path", "branch", "artifact_kind", "files", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_workspace_batch_write",
     description: "Atomically create or update up to 150 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
@@ -587,6 +615,37 @@ async function callTool(name, args, env) {
         ? ["Resolve all blocker findings, commit the fixes, then run preflight again."]
         : ["Run the engine-specific test workflow on explicit request.", "Review warnings and verify the application in a real browser or device before release."],
       limitations: ["Read-only structural analysis only.", "No project code was executed.", "No dependencies were installed.", "No build or device test was started."]
+    };
+  }
+
+  if (name === "forge_studio_artifact_save") {
+    if (args.confirm !== true) throw new Error("Artifact save not performed: confirm=true is required.");
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("project_path must identify a project directory below workspace/.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main" || !branch.startsWith("forge/projects/"))
+      throw new Error("Studio artifacts can only be saved to an existing forge/projects/ branch.");
+    if (!["design", "game_level", "project_files"].includes(args.artifact_kind))
+      throw new Error("Unsupported artifact_kind.");
+    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 20)
+      throw new Error("Studio artifact save accepts 1 to 20 files.");
+    const prefix = projectPath + "/";
+    for (const file of args.files) {
+      file.path = validateWorkspacePath(file.path);
+      if (!file.path.startsWith(prefix))
+        throw new Error("Every artifact path must stay inside project_path: " + file.path);
+    }
+    const result = await callTool("forge_workspace_batch_write", {
+      branch,
+      files: args.files,
+      confirm: true
+    }, env);
+    return {
+      ...result,
+      artifact_kind: args.artifact_kind,
+      project_path: projectPath,
+      scope: "project-directory-only",
+      note: "Committed generated Studio files only; no code execution, tests, or build were started."
     };
   }
 
