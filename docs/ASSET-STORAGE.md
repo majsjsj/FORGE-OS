@@ -21,12 +21,13 @@ If the binding is absent, the asset tools return a clear configuration error and
 - `forge_asset_multipart_abort`: explicitly discard an incomplete upload.
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
 - `forge_asset_download_url`: create an HMAC-signed, read-only URL that expires after one hour.
+- `forge_asset_import`: explicitly copy one selected R2 asset into the matching `workspace/` path on the isolated project branch. Requires `confirm=true`, refuses to overwrite existing files, and supports up to 16 MiB per imported file. After import, the asset is part of the Git project and can be included in the next explicitly requested build.
 - `forge_asset_delete`: explicitly delete one object; requires `confirm=true`.
 
 Objects are namespaced by isolated project branch and project path. They are not committed to GitHub, included in repository clones, or stored as GitHub Actions artifacts. The signed download endpoint streams the object from R2 and does not expose the bucket publicly. URLs are bearer links: anyone who receives one can download that asset until it expires, so do not post them publicly.
 
 ## Important current boundary
 
-External storage is now available as an optional independent asset store, but the build workflows do not yet automatically synchronize R2 assets into a project before compiling. For a build that needs an asset, download it into the project workspace first and commit it to the project branch, or use a future build-sync integration. Do not assume a successful upload alone makes an asset available inside an APK/AAB/Web build.
+External storage remains an optional independent asset store; builds do not automatically synchronize every R2 object. To include an uploaded asset in a build, explicitly call `forge_asset_import` for that file. The tool commits the binary into the selected isolated project branch under `workspace/`; the next explicitly requested build can then package it. A successful upload alone does not make the asset available inside an APK/AAB/Web build.
 
 The single-request upload API accepts up to 32 MiB per file per call. Larger files can use R2 multipart uploads: start once, upload sequential parts, then complete with the returned etags. Keep the `upload_id` and etags until completion; if an upload is no longer needed, call the abort tool. Incomplete multipart uploads may remain billable until aborted or removed by an owner-configured R2 lifecycle rule. The implementation does not yet provide automatic deduplication, automatic lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
