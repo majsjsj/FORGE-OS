@@ -292,12 +292,12 @@ function createSpecialistProjectPlan(args) {
   if (!allowedTypes.includes(projectType)) throw new Error("Unsupported project_type. Choose auto, web, android, flutter, godot, unity, game, api, or desktop.");
   if (projectType === "auto") {
     const text = brief.toLowerCase();
-    if (/\b(unity|c#)\\b/.test(text)) projectType = "unity";
-    else if (/\bgodot\\b/.test(text)) projectType = "godot";
-    else if (/\bflutter\\b/.test(text)) projectType = "flutter";
-    else if (/\b(android|apk|aab)\\b/.test(text)) projectType = "android";
-    else if (/\b(game|3d|2d)\\b/.test(text)) projectType = "game";
-    else if (/\b(api|backend|service)\\b/.test(text)) projectType = "api";
+    if (/\b(unity|c#)\b/.test(text)) projectType = "unity";
+    else if (/\bgodot\b/.test(text)) projectType = "godot";
+    else if (/\bflutter\b/.test(text)) projectType = "flutter";
+    else if (/\b(android|apk|aab)\b/.test(text)) projectType = "android";
+    else if (/\b(game|3d|2d)\b/.test(text)) projectType = "game";
+    else if (/\b(api|backend|service)\b/.test(text)) projectType = "api";
     else projectType = "web";
   }
   const engine = ({
