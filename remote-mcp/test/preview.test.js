@@ -97,3 +97,41 @@ test("MCP Apps resource rejects unknown UI resource URIs", async () => {
   assert.equal(result.response.status, 400);
   assert.match(result.body.error.message, /Unknown UI resource URI/);
 });
+
+test("deployed game previews are proxied from the fixed Pages origin", async () => {
+  let requested = "";
+  globalThis.fetch = async (input, init) => {
+    requested = String(input);
+    assert.equal(init.redirect, "error");
+    return new Response("<!doctype html><title>Game</title>", {
+      status: 200,
+      headers: { "content-type": "text/html" }
+    });
+  };
+  try {
+    const response = await worker.fetch(new Request(
+      "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/index.html?run_id=123"
+    ), {});
+    assert.equal(response.status, 200);
+    assert.equal(requested, "https://majsjsj.github.io/FORGE-OS/game-preview/index.html");
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(response.headers.get("content-security-policy"), "sandbox allow-scripts");
+    assert.equal(await response.text(), "<!doctype html><title>Game</title>");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("game preview proxy rejects traversal and hidden paths", async () => {
+  let fetched = false;
+  globalThis.fetch = async () => { fetched = true; return new Response("unexpected"); };
+  try {
+    const response = await worker.fetch(new Request(
+      "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/%252e%252e/secret.html"
+    ), {});
+    assert.equal(response.status, 400);
+    assert.equal(fetched, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
