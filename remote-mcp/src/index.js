@@ -955,6 +955,8 @@ async function callTool(name, args, env) {
             path.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) ||
               /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
           throw new Error("Every asset_path must be a safe relative path without hidden, traversal, or credential-like segments.");
+        if (path === "forge-assets-manifest.json")
+          throw new Error("forge-assets-manifest.json is reserved for FORGE asset integrity metadata.");
         if (seen.has(path)) throw new Error("Duplicate asset_path in batch: " + path);
         seen.add(path);
         selected.push({ asset_path: path, destination: validateWorkspacePath(project + "/" + path) });
@@ -980,8 +982,19 @@ async function callTool(name, args, env) {
             parsed.project_path !== project || !Array.isArray(parsed.files))
           throw new Error("Existing asset manifest does not match this branch/project; no assets were imported.");
         manifestFiles = parsed.files;
-        const priorPaths = new Set(manifestFiles.map(item => item.asset_path));
-        for (const item of selected) if (priorPaths.has(item.asset_path))
+        if (manifestFiles.length > 5000) throw new Error("Existing asset manifest exceeds the 5,000-entry safety limit.");
+        const priorPaths = new Set();
+        const priorDestinations = new Set();
+        for (const item of manifestFiles) {
+          if (!item || typeof item.asset_path !== "string" || typeof item.path !== "string" ||
+              !/^[a-f0-9]{64}$/i.test(item.sha256 || "") || !Number.isSafeInteger(item.size_bytes) || item.size_bytes <= 0 ||
+              item.path.startsWith("/") || item.path.includes("..") || item.path.split("/").some(part => !part || part.startsWith(".")) ||
+              priorPaths.has(item.asset_path) || priorDestinations.has(item.path))
+            throw new Error("Existing asset manifest contains invalid or duplicate entries; no assets were imported.");
+          priorPaths.add(item.asset_path);
+          priorDestinations.add(item.path);
+        }
+        for (const item of selected) if (priorPaths.has(item.asset_path) || priorDestinations.has(item.asset_path))
           throw new Error("Asset is already recorded in forge-assets-manifest.json: " + item.asset_path);
       }
       const staged = [];
