@@ -543,7 +543,7 @@ const TOOLS = [
   },
   {
     name: "forge_dispatch_build",
-    description: "Start one temporary GitHub Actions build for a project already committed under workspace/. This consumes GitHub Actions quota. Call only after the user explicitly asks to build/test and set confirm=true.",
+    description: "Start one temporary GitHub Actions build for a project already committed under workspace/. This consumes GitHub Actions quota. Call only after the user explicitly asks to build/test and set confirm=true. Optional R2 sync is off by default; set sync_assets=true only when the user explicitly selects the exact asset_paths to stage for this one run.",
     inputSchema: {
       type: "object",
       properties: {
@@ -551,7 +551,9 @@ const TOOLS = [
         project_path: { type: "string", description: "Repository-relative path, restricted to workspace/<project>." },
         branch: { type: "string", description: "Project branch to build; defaults to main for legacy projects." },
         output: { type: "string", enum: ["test", "apk", "aab", "web", "linux"] },
-        confirm: { type: "boolean", description: "Must be true only after explicit user authorization for this build." },
+        sync_assets: { type: "boolean", description: "Optional; defaults to false. When true, fetch only the exact selected R2 assets for this run using GitHub OIDC." },
+        asset_paths: { type: "array", minItems: 1, maxItems: 20, items: { type: "string", maxLength: 240 }, description: "Exact relative R2 object paths. Required with sync_assets=true; maximum 20 files / 24 MiB total." },
+        confirm: { type: "boolean", description: "Must be true only after explicit user authorization for this build and any selected asset sync." },
       },
       required: ["engine", "project_path", "output", "confirm"],
       additionalProperties: false,
@@ -1274,6 +1276,27 @@ async function callTool(name, args, env) {
     const { engine, project_path, output, confirm } = args;
     const branch = validateProjectBranch(args.branch || "main");
     if (confirm !== true) throw new Error("Build not started: confirm=true is required after explicit user authorization.");
+    const syncAssets = args.sync_assets === true;
+    let assetPaths = [];
+    if (syncAssets) {
+      if (branch === "main") throw new Error("R2 sync requires an isolated forge/projects/ branch.");
+      if (!Array.isArray(args.asset_paths) || args.asset_paths.length < 1 || args.asset_paths.length > 20)
+        throw new Error("When sync_assets=true, select 1–20 exact asset_paths.");
+      const seenAssetPaths = new Set();
+      for (const path of args.asset_paths) {
+        if (typeof path !== "string" || !path || path.length > 240 ||
+            !/^[A-Za-z0-9._/-]+$/.test(path) || path.startsWith("/") || path.includes("..") ||
+            path === "forge-assets-manifest.json" ||
+            path.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) ||
+              /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
+          throw new Error("One or more selected asset_paths are unsafe or reserved.");
+        if (seenAssetPaths.has(path)) throw new Error("Duplicate selected asset_path: " + path);
+        seenAssetPaths.add(path);
+        assetPaths.push(path);
+      }
+    } else if (args.asset_paths !== undefined) {
+      throw new Error("asset_paths may be supplied only when sync_assets=true.");
+    }
     if (!["web", "flutter", "godot", "unity"].includes(engine)) throw new Error("Unsupported engine.");
     if (typeof project_path !== "string" || !/^workspace\/[A-Za-z0-9._/-]+$/.test(project_path) ||
         project_path.includes("..") || project_path.endsWith("/")) {
@@ -1286,7 +1309,11 @@ async function callTool(name, args, env) {
     if (!allowed[engine].includes(output)) throw new Error(`Output ${output} is not supported for ${engine}.`);
     await github(env, `actions/workflows/${WORKFLOW}/dispatches`, {
       method: "POST",
-      body: JSON.stringify({ ref: "main", inputs: { engine, project_path, output, project_branch: branch } }),
+      body: JSON.stringify({ ref: "main", inputs: {
+        engine, project_path, output, project_branch: branch,
+        sync_assets: syncAssets,
+        asset_paths: syncAssets ? assetPaths.join("\n") : ""
+      } }),
     });
     return { accepted: true, engine, project_path, branch, output,
       message: "GitHub accepted the dispatch request. Query forge_latest_build after a short wait to obtain the run ID and status." };
