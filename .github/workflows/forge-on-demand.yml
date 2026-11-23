@@ -1061,3 +1061,118 @@ jobs:
       - name: Deploy interactive game preview
         id: deployment
         uses: actions/deploy-pages@v4
+
+  attest-artifact:
+    needs: [web, flutter, godot, unity]
+    if: >-
+      always() &&
+      inputs.output != 'test' &&
+      (
+        (inputs.engine == 'web' && needs.web.result == 'success') ||
+        (inputs.engine == 'flutter' && needs.flutter.result == 'success') ||
+        (inputs.engine == 'godot' && needs.godot.result == 'success') ||
+        (inputs.engine == 'unity' && needs.unity.result == 'success')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Download web artifact for attestation
+        if: inputs.engine == 'web'
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-web
+          path: ${{ runner.temp }}/forge-artifact
+      - name: Download Flutter artifact for attestation
+        if: inputs.engine == 'flutter'
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-flutter-${{ inputs.output }}
+          path: ${{ runner.temp }}/forge-artifact
+      - name: Download Godot artifact for attestation
+        if: inputs.engine == 'godot'
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-godot-${{ inputs.output }}
+          path: ${{ runner.temp }}/forge-artifact
+      - name: Download Unity artifact for attestation
+        if: inputs.engine == 'unity'
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-unity-${{ inputs.output }}
+          path: ${{ runner.temp }}/forge-artifact
+      - name: Verify the complete artifact manifest before signing
+        env:
+          ARTIFACT_ROOT: ${{ runner.temp }}/forge-artifact
+          EXPECTED_ENGINE: ${{ inputs.engine }}
+          EXPECTED_OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, re
+          from pathlib import Path, PurePosixPath
+          root = Path(os.environ["ARTIFACT_ROOT"]).resolve()
+          manifest_path = root / "forge-artifact-manifest.json"
+          if manifest_path.is_symlink() or not manifest_path.is_file():
+              raise SystemExit("Artifact manifest is missing or unsafe.")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          if manifest.get("format") != "forge-artifact-manifest-v1":
+              raise SystemExit("Unsupported artifact manifest format.")
+          if manifest.get("engine") != os.environ["EXPECTED_ENGINE"] or manifest.get("output") != os.environ["EXPECTED_OUTPUT"]:
+              raise SystemExit("Artifact manifest does not match the selected engine/output.")
+          entries = manifest.get("files")
+          if not isinstance(entries, list) or not entries or len(entries) > 10000:
+              raise SystemExit("Artifact manifest must contain between 1 and 10,000 entries.")
+          seen = set()
+          for entry in entries:
+              if not isinstance(entry, dict):
+                  raise SystemExit("Invalid artifact manifest entry.")
+              rel = entry.get("path")
+              if not isinstance(rel, str) or not rel or "\\" in rel:
+                  raise SystemExit("Invalid artifact relative path.")
+              posix = PurePosixPath(rel)
+              if posix.is_absolute() or posix.as_posix() != rel or any(part in ("", ".", "..") for part in posix.parts):
+                  raise SystemExit("Unsafe artifact path: " + rel)
+              if rel in seen:
+                  raise SystemExit("Duplicate artifact path: " + rel)
+              seen.add(rel)
+              raw_target = root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if raw_target.is_symlink() or not target.is_relative_to(root) or not target.is_file():
+                  raise SystemExit("Artifact file is missing or unsafe: " + rel)
+              expected_size = entry.get("size")
+              expected_hash = entry.get("sha256")
+              if not isinstance(expected_size, int) or expected_size < 0 or target.stat().st_size != expected_size:
+                  raise SystemExit("Artifact size mismatch: " + rel)
+              if not isinstance(expected_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", expected_hash):
+                  raise SystemExit("Invalid SHA-256 in artifact manifest: " + rel)
+              digest = hashlib.sha256()
+              with target.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              if digest.hexdigest() != expected_hash:
+                  raise SystemExit("Artifact SHA-256 mismatch: " + rel)
+          print("Verified %d artifact file(s); signing the manifest that binds their SHA-256 digests." % len(entries))
+          PY
+      - name: Generate signed GitHub artifact attestation
+        id: attest
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ runner.temp }}/forge-artifact/forge-artifact-manifest.json
+      - name: Publish attestation verification details
+        env:
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
+          ENGINE: ${{ inputs.engine }}
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          {
+            echo "## Signed artifact attestation"
+            echo "- Engine: `$ENGINE`"
+            echo "- Output: `$OUTPUT`"
+            echo "- Attestation: $ATTESTATION_URL"
+            echo "- The signed subject is `forge-artifact-manifest.json`, which contains SHA-256 hashes for every file in the build artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
