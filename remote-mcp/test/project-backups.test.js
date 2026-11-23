@@ -115,8 +115,8 @@ test("restore rejects a backup ref belonging to a different project before GitHu
     return githubResponse({});
   });
 
-  assert.equal(result.payload.error, true);
-  assert.match(result.payload.content[0].text, /does not belong to the selected project/);
+  assert.equal(result.payload.result.isError, true);
+  assert.match(result.payload.result.content[0].text, /does not belong to the selected project/);
   assert.equal(requests, 0);
 });
 
