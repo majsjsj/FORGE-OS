@@ -123,8 +123,33 @@ jobs:
                   dest = payload / rel
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   dest.write_bytes(src.read_bytes())
-          tracked = subprocess.check_output(["git", "ls-tree", "-r", "--name-only", "HEAD", "--", os.environ["PROJECT_PATH"]], text=True).splitlines()
-          deleted = sorted(set(tracked) - set(files))
+          def git_paths(args):
+              raw = subprocess.check_output(["git", *args, "-z", "--", os.environ["PROJECT_PATH"]])
+              return [item.decode("utf-8") for item in raw.split(b"\0") if item]
+          changed = set(git_paths(["diff", "--name-only", "--no-renames", "HEAD"]))
+          untracked = set(git_paths(["ls-files", "--others", "--exclude-standard"]))
+          deleted = sorted(rel for rel in changed if not (root / rel).exists())
+          candidates = sorted((changed | untracked) - set(deleted))
+          for rel in candidates:
+              src = root / rel
+              if not rel.startswith(os.environ["PROJECT_PATH"] + "/") or ".." in Path(rel).parts:
+                  raise SystemExit(f"Unsafe changed path: {rel}")
+              if not src.resolve().is_relative_to(project) or not src.is_file():
+                  raise SystemExit(f"Changed path is not a regular project file: {rel}")
+              parts = Path(rel).parts
+              low = src.name.lower()
+              if any((root.joinpath(*parts[:i])).is_symlink() for i in range(1, len(parts) + 1)):
+                  raise SystemExit(f"Refusing symlink path: {rel}")
+              if any(part in blocked_names or part.lower().startswith(".env") or "secret" in part.lower() or "credential" in part.lower() or part.lower().startswith("service-account") for part in parts) or low.endswith(tuple(blocked_suffixes)):
+                  raise SystemExit(f"Refusing to save a credential-like file: {rel}")
+              size = src.stat().st_size
+              total += size
+              files.append(rel)
+              if len(files) + len(deleted) > 200 or total > 50000000:
+                  raise SystemExit("Save limit reached: maximum 200 changed paths and 50 MB of changed file data per cloud session.")
+              dest = payload / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_bytes(src.read_bytes())
           (stage / "manifest.json").write_text(json.dumps({
               "project_path": os.environ["PROJECT_PATH"],
               "files": sorted(files),
@@ -132,7 +157,7 @@ jobs:
               "file_count": len(files),
               "total_bytes": total
           }))
-          print(f"Prepared {len(files)} project files ({total} bytes), {len(deleted)} deletions.")
+          print(f"Prepared {len(files)} changed project files ({total} bytes), {len(deleted)} deletions.")
           PY
 
       - name: Upload project delta for isolated save job
