@@ -51,3 +51,49 @@ test("preview rejects traversal before fetching project content", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+const accessToken = "mcp-app-test-token-with-more-than-32-characters";
+
+async function mcpRequest(method, params = {}, id = 1) {
+  const response = await worker.fetch(new Request("https://forge-os-remote-mcp.majsjsj.workers.dev/mcp", {
+    method: "POST",
+    headers: { authorization: "Bearer " + accessToken, "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id, method, params })
+  }), { FORGE_ACCESS_TOKEN: accessToken });
+  return { response, body: response.status === 202 ? null : await response.json() };
+}
+
+test("MCP Apps preview resource is discoverable and safely bundled", async () => {
+  const initialized = await mcpRequest("initialize", {
+    protocolVersion: "2025-03-26",
+    capabilities: {},
+    clientInfo: { name: "test-client", version: "1.0.0" }
+  });
+  assert.equal(initialized.response.status, 200);
+  assert.equal(initialized.body.result.capabilities.resources.listChanged, false);
+
+  const listed = await mcpRequest("resources/list", {}, 2);
+  assert.equal(listed.response.status, 200);
+  assert.equal(listed.body.result.resources[0].uri, "ui://forge-os/live-preview.html");
+  assert.equal(listed.body.result.resources[0].mimeType, "text/html;profile=mcp-app");
+
+  const read = await mcpRequest("resources/read", { uri: "ui://forge-os/live-preview.html" }, 3);
+  assert.equal(read.response.status, 200);
+  const resource = read.body.result.contents[0];
+  assert.equal(resource.mimeType, "text/html;profile=mcp-app");
+  assert.match(resource.text, /globalThis\.ExtApps/);
+  assert.match(resource.text, /sandbox", "allow-scripts"/);
+  assert.match(resource.text, /setInterval\(checkVersion,15000\)/);
+  assert.doesNotMatch(resource.text, /__EXT_APPS_BUNDLE__/);
+  assert.equal(resource._meta.ui.prefersBorder, false);
+
+  const tools = await mcpRequest("tools/list", {}, 4);
+  const preview = tools.body.result.tools.find(tool => tool.name === "forge_preview_url");
+  assert.equal(preview._meta.ui.resourceUri, "ui://forge-os/live-preview.html");
+});
+
+test("MCP Apps resource rejects unknown UI resource URIs", async () => {
+  const result = await mcpRequest("resources/read", { uri: "ui://forge-os/unknown.html" }, 5);
+  assert.equal(result.response.status, 400);
+  assert.match(result.body.error.message, /Unknown UI resource URI/);
+});
