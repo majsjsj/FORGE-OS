@@ -183,9 +183,8 @@ jobs:
               throw new Error('Invalid isolated project branch.');
             if (manifest.files.length > 200 || manifest.total_bytes > 50000000)
               throw new Error('Project delta exceeds the 200-file / 50-MB save limit.');
-            const blocked = p => p.split('/').some(part => ['.git','.github','.claude','.npmrc','.pypirc','key.properties','keystore.properties','id_rsa','id_ed25519'].includes(part.toLowerCase())) ||
-              p.split('/').some(part => /^\.env/i.test(part)) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(p) ||
-              /secret|credential|service-account/i.test(path.basename(p));
+            const blocked = p => p.split('/').some(part => ['.git','.github','.claude','.npmrc','.pypirc','key.properties','keystore.properties','id_rsa','id_ed25519'].includes(part.toLowerCase()) || /^\.env/i.test(part) || /secret|credential|service-account/i.test(part)) ||
+              /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(p);
             const ref = await github.rest.git.getRef({owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/' + branch});
             const parentSha = ref.data.object.sha;
             const parent = await github.rest.git.getCommit({owner: context.repo.owner, repo: context.repo.repo, commit_sha: parentSha});
