@@ -204,13 +204,13 @@ async function projectBackupPrefix(projectBranch) {
   const branch = validateProjectBranch(projectBranch);
   if (branch === "main") throw new Error("Backups require an isolated forge/projects/ branch.");
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(branch)));
-  const fingerprint = Array.from(digest).slice(0, 8).map(value => value.toString(16).padStart(2, "0")).join("");
+  const fingerprint = Array.from(digest).slice(0, 16).map(value => value.toString(16).padStart(2, "0")).join("");
   return "forge/backups/" + fingerprint + "/";
 }
 
 function validateProjectBackupBranch(backupBranch, expectedPrefix) {
   if (typeof backupBranch !== "string" || backupBranch.length > 120 ||
-      !/^forge\/backups\/[a-f0-9]{16}\/\d{13}-[a-f0-9]{8}$/.test(backupBranch) ||
+      !/^forge\/backups\/[a-f0-9]{32}\/\d{13}-[a-f0-9]{8}$/.test(backupBranch) ||
       !backupBranch.startsWith(expectedPrefix)) {
     throw new Error("Backup branch does not belong to the selected project.");
   }
@@ -328,7 +328,7 @@ const TOOLS = [
   },
   {
     name: "forge_project_backup_list",
-    description: "List point-in-time backup refs for one isolated project branch, including their commit SHAs. Read-only.",
+    description: "List point-in-time backup refs for one isolated project branch, including their commit SHAs. Works even if the original project branch was deleted. Read-only.",
     inputSchema: {
       type: "object",
       properties: { branch: { type: "string", description: "Existing forge/projects/ branch whose backups should be listed." } },
@@ -773,7 +773,6 @@ async function callTool(name, args, env) {
   if (name === "forge_project_backup_list") {
     const projectBranch = validateProjectBranch(args.branch);
     if (projectBranch === "main") throw new Error("Choose an isolated forge/projects/ branch.");
-    await branchHead(env, projectBranch);
     const backups = await listProjectBackups(env, projectBranch);
     return { project_branch: projectBranch, count: backups.length, max_backups: 25, backups };
   }
