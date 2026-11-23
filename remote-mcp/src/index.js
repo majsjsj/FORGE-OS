@@ -1,5 +1,5 @@
 import previewAppBundle from "./preview-app-bundle.js";
-import previewAppHtml from "./preview-app.html";
+import previewAppHtml from "./preview-app-template.js";
 const REPO = "majsjsj/FORGE-OS";
 const WORKFLOW = "forge-on-demand.yml";
 const TERMINAL_WORKFLOW = "forge-terminal.yml";
