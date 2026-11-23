@@ -1654,6 +1654,12 @@ export default {
       headers.set("access-control-allow-origin", "*");
       headers.set("cross-origin-resource-policy", "cross-origin");
       headers.set("x-content-type-options", "nosniff");
+      headers.set("referrer-policy", "no-referrer");
+      // Project HTML is untrusted. Give each preview document an opaque origin while
+      // allowing its game/application scripts to run; never grant allow-same-origin.
+      if (ext === "html" || ext === "htm") {
+        headers.set("content-security-policy", "sandbox allow-scripts");
+      }
       if (lowerPath.endsWith(".br")) headers.set("content-encoding", "br");
       else if (lowerPath.endsWith(".gz")) headers.set("content-encoding", "gzip");
       return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
