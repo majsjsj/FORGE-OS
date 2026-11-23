@@ -396,7 +396,7 @@ function validateProjectPlanDocument(plan) {
   if (new TextEncoder().encode(serialized).length > 256 * 1024)
     throw new Error("Project plan must not exceed 256 KiB.");
   if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(serialized) ||
-      /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\s*[:=]\s*[^\s<>{}]{12,}/i.test(serialized))
+      /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)"?\s*[:=]\s*"?[^\s"<>{}]{12,}/i.test(serialized))
     throw new Error("Project plan must not contain credential values. Store secret names/references only.");
   return plan;
 }
@@ -942,7 +942,7 @@ async function callTool(name, args, env) {
     const note = args.note === undefined ? "" : args.note;
     if (typeof note !== "string" || note.length > 2000) throw new Error("Task note must be text no longer than 2000 characters.");
     if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(note) ||
-        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\s*[:=]\s*[^\s<>{}]{12,}/i.test(note))
+        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)"?\s*[:=]\s*"?[^\s"<>{}]{12,}/i.test(note))
       throw new Error("Task notes must not contain credential values.");
     const target = validateProjectMemoryTarget(args.project_path, args.branch);
     const file = await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env);
@@ -1287,7 +1287,7 @@ async function callTool(name, args, env) {
     if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 256 * 1024)
       throw new Error("Project context must be UTF-8 text no larger than 256 KiB.");
     if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(args.content) ||
-        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\s*[:=]\s*[^\s<>{}]{12,}/i.test(args.content))
+        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)"?\s*[:=]\s*"?[^\s"<>{}]{12,}/i.test(args.content))
       throw new Error("Project context must not contain credential values. Record secret names/references only.");
     return await callTool("forge_workspace_write", {
       path: projectPath + "/FORGE_CONTEXT.md",
