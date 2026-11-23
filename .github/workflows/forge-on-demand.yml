@@ -139,7 +139,7 @@ jobs:
           print("Verified and staged %d selected R2 assets (%d bytes)." % (len(paths), total))
           PY
       - name: Upload short-lived staged asset bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: forge-r2-assets-${{ github.run_id }}
           path: ${{ runner.temp }}/forge-r2-assets/
@@ -152,13 +152,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-r2-assets-${{ github.run_id }}
           path: ${{ runner.temp }}/forge-r2-assets
@@ -240,7 +240,7 @@ jobs:
           if not resolved.is_dir():
               raise SystemExit("Project directory not found")
           PY
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
       - name: Test and build web project
@@ -320,7 +320,7 @@ jobs:
           (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: success() && inputs.output == 'web'
         with:
           name: forge-web
@@ -334,13 +334,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-r2-assets-${{ github.run_id }}
           path: ${{ runner.temp }}/forge-r2-assets
@@ -405,11 +405,11 @@ jobs:
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: '3.50.1'
           channel: stable
@@ -528,7 +528,7 @@ jobs:
           (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: success() && (inputs.output == 'apk' || inputs.output == 'aab')
         with:
           name: forge-flutter-${{ inputs.output }}
@@ -542,13 +542,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-r2-assets-${{ github.run_id }}
           path: ${{ runner.temp }}/forge-r2-assets
@@ -613,7 +613,7 @@ jobs:
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         if: inputs.output == 'apk' || inputs.output == 'aab'
         with:
           distribution: temurin
@@ -793,7 +793,7 @@ jobs:
           (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: success() && (inputs.output == 'apk' || inputs.output == 'aab' || inputs.output == 'linux' || inputs.output == 'web')
         with:
           name: forge-godot-${{ inputs.output }}
@@ -807,13 +807,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-r2-assets-${{ github.run_id }}
           path: ${{ runner.temp }}/forge-r2-assets
@@ -905,7 +905,7 @@ jobs:
       - name: Run Unity EditMode and PlayMode tests
         if: inputs.output == 'test'
         id: unity-tests
-        uses: game-ci/unity-test-runner@v4
+        uses: game-ci/unity-test-runner@32e57712352b500e17974b245a6dce9e11a73213
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -915,7 +915,7 @@ jobs:
           artifactsPath: artifacts/unity-tests
       - name: Build Unity Android APK
         if: inputs.output == 'apk'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -925,7 +925,7 @@ jobs:
           buildsPath: build
       - name: Build Unity Android AAB
         if: inputs.output == 'aab'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -954,7 +954,7 @@ jobs:
           PY
       - name: Build Unity WebGL
         if: inputs.output == 'web'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -963,7 +963,7 @@ jobs:
           buildsPath: build
       - name: Build Unity Linux
         if: inputs.output == 'linux'
-        uses: game-ci/unity-builder@v4
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
         with:
@@ -998,14 +998,14 @@ jobs:
           (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() && inputs.output == 'test'
         with:
           name: forge-unity-test-results
           path: artifacts/unity-tests
           if-no-files-found: warn
           retention-days: 3
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: success() && inputs.output != 'test'
         with:
           name: forge-unity-${{ inputs.output }}
@@ -1034,12 +1034,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}game-preview/
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
       - name: Download browser game build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: ${{ inputs.engine == 'godot' && 'forge-godot-web' || 'forge-unity-web' }}
           path: build
@@ -1061,13 +1061,13 @@ jobs:
           touch _site/.nojekyll
           touch _site/game-preview/.nojekyll
           echo "Prepared $ENGINE browser build from $ENTRY"
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
           path: _site
       - name: Deploy interactive game preview
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e
 
   attest-artifact:
     needs: [web, flutter, godot, unity]
@@ -1091,29 +1091,29 @@ jobs:
     steps:
       - name: Download web artifact for attestation
         if: inputs.engine == 'web'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-web
           path: ${{ runner.temp }}/forge-artifact
       - name: Download Flutter artifact for attestation
         if: inputs.engine == 'flutter'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-flutter-${{ inputs.output }}
           path: ${{ runner.temp }}/forge-artifact
       - name: Download Godot artifact for attestation
         if: inputs.engine == 'godot'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-godot-${{ inputs.output }}
           path: ${{ runner.temp }}/forge-artifact
       - name: Download Unity artifact for attestation
         if: inputs.engine == 'unity'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: forge-unity-${{ inputs.output }}
           path: ${{ runner.temp }}/forge-artifact
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
@@ -1126,7 +1126,7 @@ jobs:
           python scripts/verify-forge-artifact.py --root "$ARTIFACT_ROOT" --engine "$EXPECTED_ENGINE" --output "$EXPECTED_OUTPUT"
       - name: Generate signed GitHub artifact attestation
         id: attest
-        uses: actions/attest@v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-path: ${{ runner.temp }}/forge-artifact/forge-artifact-manifest.json
       - name: Publish attestation verification details
