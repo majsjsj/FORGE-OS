@@ -18,6 +18,10 @@ on:
         type: choice
         options: [test, apk, aab, web, linux]
         default: test
+      project_branch:
+        description: Isolated project branch (defaults to the dispatch ref)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -35,6 +39,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - name: Validate project path
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
@@ -73,6 +79,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -182,6 +190,8 @@ jobs:
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - uses: actions/setup-java@v4
         if: inputs.output == 'apk' || inputs.output == 'aab'
         with:
@@ -348,6 +358,8 @@ jobs:
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - name: Validate Unity project and license
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
@@ -451,6 +463,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}game-preview/
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch || github.ref }}
       - name: Download browser game build
         uses: actions/download-artifact@v4
         with:

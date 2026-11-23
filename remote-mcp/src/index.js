@@ -31,6 +31,24 @@ function validateWorkspacePath(path, allowDirectory = false) {
   return path;
 }
 
+function validateProjectBranch(branch = "main") {
+  if (typeof branch !== "string" || branch.length > 120 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(branch) ||
+      branch.includes("..") || branch.includes("//") || branch.endsWith("/") ||
+      branch.split("/").some(part => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) {
+    throw new Error("Invalid branch name. Project branches must use safe Git ref characters.");
+  }
+  if (branch !== "main" && !branch.startsWith("forge/projects/"))
+    throw new Error("Project branches must be under forge/projects/. Use main only for read-only access.");
+  return branch;
+}
+
+async function branchHead(env, branch = "main") {
+  const safe = validateProjectBranch(branch);
+  const result = await github(env, "git/ref/heads/" + safe);
+  return result.object.sha;
+}
+
 function decodeBase64Utf8(value) {
   const binary = atob(value.replace(/\n/g, ""));
   const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
@@ -79,22 +97,42 @@ async function github(env, path, options = {}) {
 
 const TOOLS = [
   {
+    name: "forge_project_branch_create",
+    description: "Create an isolated project branch under forge/projects/ from main or another project branch. Does not modify main. Requires confirm=true after the user asks to create a project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Unique branch name, for example forge/projects/my-game." },
+        base_branch: { type: "string", description: "main or another forge/projects/ branch; defaults to main." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_branch_list",
+    description: "List existing isolated project branches under forge/projects/. Read-only.",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
     name: "forge_workspace_list",
-    description: "List files and folders inside workspace/ in the connected FORGE repository.",
-    inputSchema: { type: "object", properties: { path: { type: "string", description: "workspace/ or a subfolder under it." } }, required: ["path"], additionalProperties: false },
+    description: "List files and folders inside workspace/ on a selected project branch (defaults to main).",
+    inputSchema: { type: "object", properties: { path: { type: "string", description: "workspace/ or a subfolder under it." }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["path"], additionalProperties: false },
   },
   {
     name: "forge_workspace_read",
-    description: "Read a UTF-8 project file committed in workspace/. Returns its blob SHA for safe updates.",
-    inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false },
+    description: "Read a UTF-8 project file from a selected branch. Returns its blob SHA for safe updates.",
+    inputSchema: { type: "object", properties: { path: { type: "string" }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["path"], additionalProperties: false },
   },
   {
     name: "forge_workspace_write",
-    description: "Create or update a UTF-8 project file in workspace/ as a Git commit. Requires confirm=true after the user asks you to create or edit project files. For updates, pass the SHA returned by forge_workspace_read.",
+    description: "Create or update a UTF-8 project file on a forge/projects/ branch as a Git commit. Direct writes to main are blocked. Requires confirm=true. For updates, pass the SHA returned by forge_workspace_read.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string" },
+        branch: { type: "string", description: "Project branch; defaults to main." },
         content: { type: "string" },
         expected_sha: { type: "string", description: "Required when updating an existing file; omit only when creating a new file." },
         confirm: { type: "boolean" },
@@ -105,20 +143,21 @@ const TOOLS = [
   },
   {
     name: "forge_project_inspect",
-    description: "Inspect a committed project directory without running a build. Returns a bounded recursive file inventory, detected engine/framework, likely entry points, manifest summaries, and source-size totals. Read-only and does not consume Actions quota.",
+    description: "Inspect a committed project directory on a selected branch without running a build. Returns a bounded recursive inventory, detected engine/framework, entry points, and source-size totals.",
     inputSchema: {
       type: "object",
-      properties: { project_path: { type: "string", description: "Project directory such as workspace/my-app." } },
+      properties: { project_path: { type: "string", description: "Project directory such as workspace/my-app." }, branch: { type: "string", description: "Project branch; defaults to main." } },
       required: ["project_path"],
       additionalProperties: false
     },
   },
   {
     name: "forge_workspace_batch_write",
-    description: "Atomically create or update up to 40 UTF-8 project files in one Git commit. Requires confirm=true after the user asks for these edits. For every existing file, provide expected_sha from forge_workspace_read; new files must omit expected_sha. Rejects stale versions and never partially writes a batch.",
+    description: "Atomically create or update up to 40 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
       type: "object",
       properties: {
+        branch: { type: "string", description: "Project branch; defaults to main." },
         files: {
           type: "array",
           minItems: 1,
@@ -143,7 +182,7 @@ const TOOLS = [
   {
     name: "forge_preview_url",
     description: "Return an interactive HTTPS preview URL for a committed HTML entry file inside workspace/. Relative JS, CSS, image, audio, and WebAssembly assets are served from the same project folder. This is a public read-only preview of the public repository; it does not start a build or consume Actions quota.",
-    inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." } }, required: ["entry_file"], additionalProperties: false },
+    inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["entry_file"], additionalProperties: false },
   },
   {
     name: "forge_game_preview_url",
@@ -163,6 +202,7 @@ const TOOLS = [
       properties: {
         engine: { type: "string", enum: ["web", "flutter", "godot", "unity"] },
         project_path: { type: "string", description: "Repository-relative path, restricted to workspace/<project>." },
+        branch: { type: "string", description: "Project branch to build; defaults to main for legacy projects." },
         output: { type: "string", enum: ["test", "apk", "aab", "web", "linux"] },
         confirm: { type: "boolean", description: "Must be true only after explicit user authorization for this build." },
       },
@@ -203,41 +243,71 @@ const TOOLS = [
 ];
 
 async function callTool(name, args, env) {
+  if (name === "forge_project_branch_create") {
+    if (args.confirm !== true) throw new Error("Branch creation not performed: confirm=true is required after the user asks to create a project.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main") throw new Error("main cannot be created or replaced as a project branch.");
+    const baseBranch = validateProjectBranch(args.base_branch || "main");
+    const baseSha = await branchHead(env, baseBranch);
+    try {
+      await github(env, "git/ref/heads/" + branch);
+      throw new Error("Branch already exists: " + branch);
+    } catch (error) {
+      if (!String(error?.message || error).includes("GitHub API 404")) throw error;
+    }
+    const created = await github(env, "git/refs", {
+      method: "POST",
+      body: JSON.stringify({ ref: "refs/heads/" + branch, sha: baseSha })
+    });
+    return { created: true, branch, base_branch: baseBranch, commit_sha: created.object.sha,
+      message: "Project branch created. Subsequent project edits and builds should target this branch, not main." };
+  }
+
+  if (name === "forge_project_branch_list") {
+    const data = await github(env, "branches?per_page=100");
+    return (data || []).filter(item => item.name.startsWith("forge/projects/"))
+      .map(item => ({ branch: item.name, commit_sha: item.commit.sha, protected: item.protected }));
+  }
   if (name === "forge_workspace_list") {
     const path = validateWorkspacePath(args.path, true);
-    const entries = await github(env, `contents/${path}`);
+    const branch = validateProjectBranch(args.branch || "main");
+    const entries = await github(env, `contents/${path}?ref=${encodeURIComponent(branch)}`);
     if (!Array.isArray(entries)) throw new Error("The requested path is not a directory.");
     return entries.filter(entry => ![".git", ".github", ".claude"].includes(entry.name))
-      .map(entry => ({ name: entry.name, path: entry.path, type: entry.type, size: entry.size, sha: entry.sha }));
+      .map(entry => ({ name: entry.name, path: entry.path, type: entry.type, size: entry.size, sha: entry.sha, branch }));
   }
 
   if (name === "forge_workspace_read") {
     const path = validateWorkspacePath(args.path);
-    const file = await github(env, `contents/${path}`);
+    const branch = validateProjectBranch(args.branch || "main");
+    const file = await github(env, `contents/${path}?ref=${encodeURIComponent(branch)}`);
     if (Array.isArray(file) || typeof file.content !== "string" || file.encoding !== "base64")
       throw new Error("The requested path is not a readable text file.");
-    return { path: file.path, sha: file.sha, content: decodeBase64Utf8(file.content) };
+    return { path: file.path, sha: file.sha, branch, content: decodeBase64Utf8(file.content) };
   }
 
   if (name === "forge_workspace_write") {
     const path = validateWorkspacePath(args.path);
+    const branch = validateProjectBranch(args.branch || "main");
+    if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     if (args.confirm !== true) throw new Error("Write not performed: confirm=true is required after the user asks to create or edit project files.");
     if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 500000)
       throw new Error("File content must be UTF-8 text no larger than 500 KB.");
     if (args.expected_sha !== undefined && (typeof args.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(args.expected_sha)))
       throw new Error("expected_sha must be a valid Git blob SHA.");
-    const payload = { message: `FORGE: update ${path}`, content: encodeBase64Utf8(args.content) };
+    const payload = { message: `FORGE: update ${path}`, content: encodeBase64Utf8(args.content), branch };
     if (args.expected_sha) payload.sha = args.expected_sha;
     const saved = await github(env, `contents/${path}`, { method: "PUT", body: JSON.stringify(payload) });
-    return { saved: true, path: saved.content.path, sha: saved.content.sha,
+    return { saved: true, path: saved.content.path, sha: saved.content.sha, branch,
       commit_sha: saved.commit.sha, html_url: saved.content.html_url };
   }
 
   if (name === "forge_project_inspect") {
     const projectPath = validateWorkspacePath(args.project_path, true);
+    const branch = validateProjectBranch(args.branch || "main");
     if (projectPath === "workspace") throw new Error("Choose a project directory inside workspace/, not the workspace root.");
-    const ref = await github(env, "git/ref/heads/main");
-    const commit = await github(env, "git/commits/" + ref.object.sha);
+    const headSha = await branchHead(env, branch);
+    const commit = await github(env, "git/commits/" + headSha);
     const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
     if (tree.truncated) throw new Error("Repository tree is too large for a complete safe project inventory.");
     const prefix = projectPath + "/";
@@ -257,7 +327,7 @@ async function callTool(name, args, env) {
     for (const name of manifests.slice(0, 8)) {
       const item = files.find(file => file.path === prefix + name);
       if (!item || (item.size || 0) > 100000) continue;
-      const result = await github(env, "contents/" + item.path);
+      const result = await github(env, "contents/" + item.path + "?ref=" + encodeURIComponent(branch));
       if (result.encoding === "base64" && typeof result.content === "string")
         manifestData[name] = decodeBase64Utf8(result.content);
     }
@@ -288,7 +358,7 @@ async function callTool(name, args, env) {
     const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
     return {
       project_path: projectPath,
-      branch: "main",
+      branch,
       engine,
       framework,
       file_count: files.length,
@@ -297,7 +367,7 @@ async function callTool(name, args, env) {
       files: sorted.slice(0, 300).map(item => ({ path: item.path, size: item.size || 0, sha: item.sha })),
       manifests_found: manifests,
       likely_entry_points: entryCandidates,
-      note: "Read-only inventory of committed main-branch files. No project code was executed and no build was started."
+      note: "Read-only inventory of committed files on the selected branch. No project code was executed and no build was started."
     };
   }
 
@@ -305,6 +375,8 @@ async function callTool(name, args, env) {
     if (args.confirm !== true) throw new Error("Batch write not performed: confirm=true is required after the user asks for these project edits.");
     if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 40)
       throw new Error("files must contain between 1 and 40 file entries.");
+    const branch = validateProjectBranch(args.branch || "main");
+    if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     const seen = new Set();
     let totalBytes = 0;
     for (const file of args.files) {
@@ -321,8 +393,7 @@ async function callTool(name, args, env) {
         throw new Error("Invalid expected_sha for " + file.path);
     }
     if (totalBytes > 2000000) throw new Error("The complete batch must be no larger than 2 MB.");
-    const ref = await github(env, "git/ref/heads/main");
-    const parent = ref.object.sha;
+    const parent = await branchHead(env, branch);
     const commit = await github(env, "git/commits/" + parent);
     const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
     if (tree.truncated) throw new Error("Repository tree is too large to safely validate this batch.");
@@ -350,14 +421,14 @@ async function callTool(name, args, env) {
       method: "POST",
       body: JSON.stringify({ message: "FORGE: atomic project update (" + entries.length + " files)", tree: nextTree.sha, parents: [parent] })
     });
-    await github(env, "git/refs/heads/main", {
+    await github(env, "git/refs/heads/" + branch, {
       method: "PATCH",
       body: JSON.stringify({ sha: nextCommit.sha, force: false })
     });
     return {
       saved: true,
       atomic: true,
-      branch: "main",
+      branch,
       files: entries.map(entry => ({ path: entry.path, sha: entry.sha })),
       file_count: entries.length,
       total_bytes: totalBytes,
@@ -368,12 +439,13 @@ async function callTool(name, args, env) {
 
   if (name === "forge_preview_url") {
     const entry = validateWorkspacePath(args.entry_file);
+    const branch = validateProjectBranch(args.branch || "main");
     if (!entry.toLowerCase().endsWith(".html")) throw new Error("entry_file must point to a committed .html file inside workspace/.");
     const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\/$/, "");
     const projectDir = entry.slice(0, entry.lastIndexOf("/"));
-    return { entry_file: entry, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/"),
-      version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/"),
-      mode: "interactive-browser-preview", auto_refresh: true, source: "committed main branch",
+    return { entry_file: entry, branch, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
+      version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
+      mode: "interactive-browser-preview", auto_refresh: true, source: "committed " + branch + " branch",
       note: "The preview refreshes after a new commit touching this project folder. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
   }
 
@@ -402,6 +474,7 @@ async function callTool(name, args, env) {
 
   if (name === "forge_dispatch_build") {
     const { engine, project_path, output, confirm } = args;
+    const branch = validateProjectBranch(args.branch || "main");
     if (confirm !== true) throw new Error("Build not started: confirm=true is required after explicit user authorization.");
     if (!["web", "flutter", "godot", "unity"].includes(engine)) throw new Error("Unsupported engine.");
     if (typeof project_path !== "string" || !/^workspace\/[A-Za-z0-9._/-]+$/.test(project_path) ||
@@ -415,9 +488,9 @@ async function callTool(name, args, env) {
     if (!allowed[engine].includes(output)) throw new Error(`Output ${output} is not supported for ${engine}.`);
     await github(env, `actions/workflows/${WORKFLOW}/dispatches`, {
       method: "POST",
-      body: JSON.stringify({ ref: "main", inputs: { engine, project_path, output } }),
+      body: JSON.stringify({ ref: branch, inputs: { engine, project_path, output, project_branch: branch } }),
     });
-    return { accepted: true, engine, project_path, output,
+    return { accepted: true, engine, project_path, branch, output,
       message: "GitHub accepted the dispatch request. Query forge_latest_build after a short wait to obtain the run ID and status." };
   }
 
@@ -499,10 +572,12 @@ export default {
       let projectDir;
       try { projectDir = decodeURIComponent(url.pathname.slice("/preview-version/".length)); }
       catch { return new Response("Invalid preview path", { status: 400 }); }
+      let branch;
       try {
         validateWorkspacePath(projectDir, true);
-        const commits = await github(env, "commits?path=" + encodeURIComponent(projectDir) + "&per_page=1");
-        return new Response(JSON.stringify({ version: commits[0]?.sha || null }), {
+        branch = validateProjectBranch(url.searchParams.get("ref") || "main");
+        const commits = await github(env, "commits?path=" + encodeURIComponent(projectDir) + "&sha=" + encodeURIComponent(branch) + "&per_page=1");
+        return new Response(JSON.stringify({ version: commits[0]?.sha || null, branch }), {
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
             "access-control-allow-origin": "*", "x-content-type-options": "nosniff" }
         });
@@ -515,12 +590,15 @@ export default {
     }
     if (url.pathname.startsWith("/preview/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
-      let projectFile;
-      try { projectFile = decodeURIComponent(url.pathname.slice("/preview/".length)); }
-      catch { return new Response("Invalid preview path", { status: 400 }); }
+      let projectFile, branch;
+      try {
+        projectFile = decodeURIComponent(url.pathname.slice("/preview/".length));
+        branch = validateProjectBranch(url.searchParams.get("ref") || "main");
+      } catch { return new Response("Invalid preview path or branch", { status: 400 }); }
       if (!/^workspace\/[A-Za-z0-9._/-]+$/.test(projectFile) || projectFile.includes("..") ||
           projectFile.split("/").some(part => !part || part.startsWith("."))) return new Response("Invalid preview path", { status: 400 });
-      const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/main/" + projectFile);
+      const rawBranch = branch.split("/").map(encodeURIComponent).join("/");
+      const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/" + rawBranch + "/" + projectFile.split("/").map(encodeURIComponent).join("/"));
       if (!upstream.ok) return new Response(upstream.status === 404 ? "Preview file not found in the public main branch." : "Preview source unavailable.", { status: upstream.status });
       const ext = projectFile.toLowerCase().split(".").pop();
       const types = { html:"text/html; charset=utf-8", htm:"text/html; charset=utf-8", js:"application/javascript; charset=utf-8",
@@ -563,8 +641,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.3.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Use forge_project_inspect to inventory a committed project before editing; use forge_workspace_batch_write to atomically create/update related files in one commit; existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.4.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});

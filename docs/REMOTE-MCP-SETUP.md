@@ -6,7 +6,8 @@ This is the first remote-control layer for FORGE-OS. It is a stateless Streamabl
 
 - Authenticated MCP endpoint at `/mcp` using a dedicated bearer token.
 - Health check.
-- Read/list/create/update text files inside `workspace/`; `forge_project_inspect` provides a bounded read-only project inventory and framework detection, while `forge_workspace_batch_write` creates up to 40 related files in one atomic Git commit (2 MB total cap) with optimistic SHA checks.
+- Project branch lifecycle: `forge_project_branch_create` creates isolated `forge/projects/<name>` branches from `main` or another project branch; `forge_project_branch_list` lists the first 100 project branches.
+- Branch-aware read/list/inspect/write/batch-write/preview/build operations. Project writes are blocked on `main`; batch writes remain atomic (up to 40 files, 2 MB total) with optimistic SHA checks.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
 - Latest build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
 - Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
@@ -49,8 +50,10 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 ## Use safely
 
 - First call `forge_health`.
-- Use `forge_project_inspect` for a recursive project inventory and engine/framework detection, then `forge_workspace_list` and `forge_workspace_read` for detailed file inspection. Use `forge_workspace_write` for one file or `forge_workspace_batch_write` for related files in one atomic commit. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Batch limit: 40 files, 500 KB per file, 2 MB total. All writes target `main`.
-- The controller does not yet sync uncommitted browser-editor drafts or create isolated branches per project. Multi-file writes are atomic, but project-level branch isolation and review/merge workflows remain future work.
+- Create a unique project branch first, for example `forge/projects/my-game`, using `forge_project_branch_create` with `confirm=true`. Then pass that branch to `forge_project_inspect`, `forge_workspace_list`, `forge_workspace_read`, `forge_workspace_write`, `forge_workspace_batch_write`, `forge_preview_url`, and `forge_dispatch_build`.
+- Direct writes to `main` are blocked. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Batch limit: 40 files, 500 KB per file, 2 MB total.
+- `forge_preview_url` serves the selected branch. Builds check out the selected branch. Changes remain isolated until an explicit review/merge process; this release does not yet provide an in-product merge or PR-approval tool.
+- The controller still does not sync uncommitted browser-editor drafts or upload binary project assets.
 - Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
 - Poll `forge_latest_build` or inspect `forge_build_details`; retrieve logs with `forge_build_logs` if needed.
 - Use `forge_artifact_download` with an artifact ID from build details to obtain a temporary ZIP download link. Download links expire; artifacts are retained for only three days.
@@ -61,4 +64,4 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 
 ## Protocol notes
 
-The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, branch isolation, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
+The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, in-product PR review/merge, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
