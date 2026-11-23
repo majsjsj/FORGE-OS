@@ -90,6 +90,8 @@ test("MCP Apps preview resource is discoverable and safely bundled", async () =>
   const tools = await mcpRequest("tools/list", {}, 4);
   const preview = tools.body.result.tools.find(tool => tool.name === "forge_preview_url");
   assert.equal(preview._meta.ui.resourceUri, "ui://forge-os/live-preview.html");
+  const gamePreview = tools.body.result.tools.find(tool => tool.name === "forge_game_preview_url");
+  assert.equal(gamePreview._meta.ui.resourceUri, "ui://forge-os/live-preview.html");
 });
 
 test("MCP Apps resource rejects unknown UI resource URIs", async () => {
