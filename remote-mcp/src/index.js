@@ -1599,6 +1599,9 @@ export default {
       headers.set("etag", object.httpEtag);
       headers.set("cache-control", "private, max-age=300");
       headers.set("x-content-type-options", "nosniff");
+      const downloadName = (key.split("/").pop() || "forge-asset").replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 120) || "forge-asset";
+      headers.set("content-disposition", 'attachment; filename="' + downloadName + '"');
+      headers.set("content-security-policy", "sandbox; default-src 'none'; object-src 'none'; base-uri 'none'");
       return new Response(request.method === "HEAD" ? null : object.body, { headers });
     }
     if (url.pathname.startsWith("/preview-version/")) {
