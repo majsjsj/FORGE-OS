@@ -81,8 +81,11 @@ async function handleActionsAssetSync(request, env) {
   try {
     if (Number(request.headers.get("content-length") || 0) > 16000)
       return json({ error: "Asset sync request is too large." }, 413);
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > 16000)
+      return json({ error: "Asset sync request is too large." }, 413);
     const claims = await verifyGitHubActionsToken(authorization.slice(7));
-    const body = await request.json();
+    const body = JSON.parse(rawBody);
     const bucket = env.FORGE_ASSETS_BUCKET;
     if (!bucket || typeof bucket.get !== "function") throw new Error("External R2 asset storage is not configured.");
     const run = await github(env, "actions/runs/" + claims.run_id);
