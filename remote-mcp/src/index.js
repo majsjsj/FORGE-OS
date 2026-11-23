@@ -262,7 +262,7 @@ const TOOLS = [
       branch: { type: "string" },
       project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
       asset_path: { type: "string", description: "Asset file path inside that project, for example assets/characters/hero.png." },
-      content_base64: { type: "string", description: "Base64-encoded binary file, up to 16 MiB decoded." },
+      content_base64: { type: "string", description: "Base64-encoded binary file, up to 32 MiB decoded." },
       content_type: { type: "string", description: "Optional MIME type, e.g. image/png or audio/ogg." },
       confirm: { type: "boolean" }
     }, required: ["branch","project_path","asset_path","content_base64","confirm"], additionalProperties: false }
