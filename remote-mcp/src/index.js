@@ -988,7 +988,7 @@ async function callTool(name, args, env) {
         for (const item of manifestFiles) {
           if (!item || typeof item.asset_path !== "string" || typeof item.path !== "string" ||
               !/^[a-f0-9]{64}$/i.test(item.sha256 || "") || !Number.isSafeInteger(item.size_bytes) || item.size_bytes <= 0 ||
-              item.path.startsWith("/") || item.path.includes("..") || item.path.split("/").some(part => !part || part.startsWith(".")) ||
+              item.path.startsWith("/") || item.path.includes("..") || item.path.includes("\\") || item.path !== item.asset_path || item.path.split("/").some(part => !part || part.startsWith(".")) ||
               priorPaths.has(item.asset_path) || priorDestinations.has(item.path))
             throw new Error("Existing asset manifest contains invalid or duplicate entries; no assets were imported.");
           priorPaths.add(item.asset_path);
