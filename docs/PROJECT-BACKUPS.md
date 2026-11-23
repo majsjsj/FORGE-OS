@@ -13,13 +13,13 @@ FORGE provides explicit point-in-time Git snapshots for isolated project branche
 
 - Up to 25 backup refs are retained per project branch.
 - Creating a 26th snapshot is refused until an old snapshot is explicitly deleted.
-- Backup refs are stored under `forge/backups/<project-fingerprint>/<timestamp>-<id>`. The fingerprint keeps branch names short and avoids collisions between similar project names.
+- Backup refs are stored under `forge/backups/<sha256-project-fingerprint>/<timestamp>-<id>`. The 128-bit fingerprint keeps branch names manageable while avoiding collisions between similar project names.
 - FORGE never automatically deletes old snapshots. The repository owner can still change or delete Git refs directly in GitHub; backup refs are protected by FORGE's tool behavior, not by a GitHub immutable-storage guarantee.
 
 ## Safe recovery procedure
 
 1. Call `forge_project_backup_list` for the affected `forge/projects/...` branch.
-2. Select the exact snapshot commit and confirm it is the intended recovery point.
+2. Select the exact snapshot commit and confirm it is the intended recovery point. The backup list can still be queried by the original branch name even if that project branch was deleted.
 3. Call `forge_project_backup_restore` with a new, unused project branch name.
 4. Inspect the new branch with `forge_project_inspect` and `forge_project_preflight`.
 5. Preview or test the restored branch as needed. Any build or test run still requires its own explicit authorization.
