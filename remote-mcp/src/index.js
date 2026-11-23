@@ -1,3 +1,5 @@
+import previewAppBundle from "./preview-app-bundle.js";
+import previewAppHtml from "./preview-app-template.js";
 const REPO = "majsjsj/FORGE-OS";
 const WORKFLOW = "forge-on-demand.yml";
 const TERMINAL_WORKFLOW = "forge-terminal.yml";
@@ -690,12 +692,14 @@ const TOOLS = [
   },
   {
     name: "forge_preview_url",
-    description: "Return an interactive HTTPS preview URL for a committed HTML entry file inside workspace/. Relative JS, CSS, image, audio, and WebAssembly assets are served from the same project folder. This is a public read-only preview of the public repository; it does not start a build or consume Actions quota.",
+    description: "Return an interactive HTTPS preview URL for a committed HTML entry file inside workspace/. In Claude, this tool also opens the project in an embedded interactive MCP App preview. Relative JS, CSS, image, audio, and WebAssembly assets are served from the same project folder. This is a public read-only preview of the public repository; it does not start a build or consume Actions quota.",
+    _meta: { ui: { resourceUri: "ui://forge-os/live-preview.html" } },
     inputSchema: { type: "object", properties: { entry_file: { type: "string", description: "Committed HTML entry file, for example workspace/my-game/index.html or workspace/my-game/build/index.html." }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["entry_file"], additionalProperties: false },
   },
   {
     name: "forge_game_preview_url",
-    description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return the playable browser preview URL. Read-only; does not start a build.",
+    description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return its playable inline MCP App preview in Claude. Read-only; does not start a build.",
+    _meta: { ui: { resourceUri: "ui://forge-os/live-preview.html" } },
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -1388,7 +1392,7 @@ async function callTool(name, args, env) {
       if (!artifact) continue;
       return { found: true, engine: artifact.name.startsWith("forge-godot") ? "Godot" : "Unity",
         run_id: run.id, run_url: run.html_url, artifact_name: artifact.name,
-        preview_url: "https://majsjsj.github.io/FORGE-OS/game-preview/",
+        preview_url: "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/" + run.id + "/index.html",
         note: "This URL serves the latest successful Web build that completed the preview-site deployment. It is interactive in a browser; Android APK/AAB files are not browser previews." };
     }
     return { found: false, message: "No successful Godot or Unity Web build with a completed Pages deployment was found yet. Request an authorized Web build first." };
@@ -1836,9 +1840,52 @@ async function callTool(name, args, env) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
+
+async function handleGamePreview(request, url) {
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response("Method not allowed", { status: 405 });
+  let path;
+  try {
+    path = decodeURIComponent(url.pathname.slice("/game-preview/".length));
+    const segments = path.split("/");
+    const buildId = segments.shift();
+    if (!/^\d{1,20}$/.test(buildId || "")) throw new Error("A valid deployed build ID is required.");
+    path = segments.join("/") || "index.html";
+    if (path.length > 500 || !/^[A-Za-z0-9._/-]+$/.test(path) || path.includes("\\\\") ||
+        path.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")))
+      throw new Error("Unsafe game preview path.");
+  } catch {
+    return new Response("Invalid game preview path.", { status: 400 });
+  }
+  const upstreamPath = path.split("/").map(encodeURIComponent).join("/");
+  let upstream;
+  try {
+    upstream = await fetch("https://majsjsj.github.io/FORGE-OS/game-preview/" + upstreamPath, {
+      method: request.method, redirect: "error",
+      headers: { accept: request.headers.get("accept") || "*/*" }
+    });
+  } catch {
+    return new Response("Game preview upstream is unavailable.", { status: 502 });
+  }
+  const headers = new Headers(upstream.headers);
+  headers.set("cache-control", upstream.ok ? "public, max-age=31536000, immutable" : "no-store");
+  headers.set("access-control-allow-origin", "*");
+  headers.set("cross-origin-resource-policy", "cross-origin");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "no-referrer");
+  if (path.toLowerCase().endsWith(".html")) {
+    headers.set("content-type", "text/html; charset=utf-8");
+    headers.set("content-security-policy", "sandbox allow-scripts");
+  }
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status, headers
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/game-preview/")) return handleGamePreview(request, url);
     if (url.pathname === "/actions/assets") return handleActionsAssetSync(request, env);
     if (url.pathname.startsWith("/assets/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
@@ -1951,10 +1998,31 @@ export default {
     if (message.method === "initialize") {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
-        capabilities: { tools: { listChanged: false } },
+        capabilities: { tools: { listChanged: false }, resources: { listChanged: false } },
         serverInfo: { name: "FORGE-OS Remote Controller", version: "0.9.0" },
-        instructions: "For a new project or major feature, call forge_project_plan first and use its product, architecture, UX, engineering, QA, security, and release handoffs as a checklist; this is model-directed planning, not autonomous agent spawning; persist approved plans with forge_project_plan_save, recover them with forge_project_plan_read, and record task status with forge_project_task_update using the latest file SHA. FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; create point-in-time snapshots with forge_project_backup_create, inspect them with forge_project_backup_list, restore into a new isolated branch with forge_project_backup_restore (never overwrites the source branch), and delete only an explicitly selected old snapshot with forge_project_backup_delete; read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured; use forge_asset_import or forge_asset_import_batch to explicitly stage selected R2 files into the project branch before a separately authorized build. R2 assets are not fetched automatically by GitHub build runners. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        instructions: "For a new project or major feature, call forge_project_plan first and use its product, architecture, UX, engineering, QA, security, and release handoffs as a checklist; this is model-directed planning, not autonomous agent spawning; persist approved plans with forge_project_plan_save, recover them with forge_project_plan_read, and record task status with forge_project_task_update using the latest file SHA. FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; create point-in-time snapshots with forge_project_backup_create, inspect them with forge_project_backup_list, restore into a new isolated branch with forge_project_backup_restore (never overwrites the source branch), and delete only an explicitly selected old snapshot with forge_project_backup_delete; read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured; use forge_asset_import or forge_asset_import_batch to explicitly stage selected R2 files into the project branch before a separately authorized build. R2 assets are not fetched automatically by GitHub build runners. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. After committing or updating an HTML project, call forge_preview_url to open its interactive MCP App preview in Claude; call it again after later commits to show the latest project version. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
+    }
+    if (message.method === "resources/list") return rpc(message.id, {
+      resources: [{
+        uri: "ui://forge-os/live-preview.html",
+        name: "FORGE-OS Live Preview",
+        description: "Sandboxed interactive preview for committed HTML projects and deployed Godot/Unity Web builds.",
+        mimeType: "text/html;profile=mcp-app",
+        _meta: { ui: { csp: { connectDomains: ["https://forge-os-remote-mcp.majsjsj.workers.dev"] }, prefersBorder: false } }
+      }]
+    });
+    if (message.method === "resources/read") {
+      const uri = message.params?.uri;
+      if (uri !== "ui://forge-os/live-preview.html")
+        return rpcError(message.id, -32602, "Unknown UI resource URI.");
+      const html = previewAppHtml.replace("/*__EXT_APPS_BUNDLE__*/", previewAppBundle);
+      return rpc(message.id, { contents: [{
+        uri,
+        mimeType: "text/html;profile=mcp-app",
+        text: html,
+        _meta: { ui: { csp: { connectDomains: ["https://forge-os-remote-mcp.majsjsj.workers.dev"] }, prefersBorder: false } }
+      }] });
     }
     if (message.method === "ping") return rpc(message.id, {});
     if (message.method === "tools/list") return rpc(message.id, { tools: TOOLS });

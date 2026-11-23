@@ -82,3 +82,14 @@ The MCP tools `forge_project_context_read` and `forge_project_context_save` prov
 ## Specialist project orchestration
 
 The MCP tool `forge_project_plan` returns a dependency-ordered plan and role contracts for product, architecture, UX, platform engineering, QA, security, and release. It is a deterministic planning tool for the connected conversational model; it does not spawn independent models or execute project work. Approved plans can be saved as `FORGE_PLAN.json` with `forge_project_plan_save`, recovered with `forge_project_plan_read`, and tracked through `forge_project_task_update`. See [specialist planning and project orchestration](SPECIALIST-AGENTS.md) for the lifecycle and approval boundaries.
+
+## Inline interactive preview inside Claude
+
+The Remote MCP Worker exposes a standard MCP Apps UI resource at `ui://forge-os/live-preview.html`, linked to both `forge_preview_url` and `forge_game_preview_url`. In Claude clients with MCP Apps enabled, calling either tool renders an interactive preview directly in the conversation; clients without MCP Apps support retain the existing text/URL result.
+
+- HTML/Web projects are loaded from the committed branch through the existing public preview endpoint.
+- The latest successfully deployed Godot/Unity Web export is served through a fixed-origin, build-ID-scoped GitHub Pages proxy so relative engine assets load inside the chat preview.
+- The preview app polls HTML project versions every 60 seconds and reloads after a new commit. Game previews use a build-specific URL and are refreshed when Claude calls the game preview tool after a successful deployment.
+- Untrusted project HTML runs in a nested sandboxed iframe with scripts enabled but no same-origin access, forms, popups, or top-level navigation. Only the FORGE preview origin is allowed for project network/assets.
+- This is a browser/Web export preview, not an Android emulator. Native APK/AAB files still require installation on a device. Single-threaded Godot/Unity Web exports are the baseline; threaded builds requiring cross-origin isolation are not guaranteed.
+- Preview reads and proxying do not dispatch GitHub Actions. Any build needed to create a new preview remains approval-gated and consumes the normal build quota.

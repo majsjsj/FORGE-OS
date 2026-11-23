@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FORGE-OS Live Preview</title>
+<style>
+:root{color-scheme:light dark;font:14px system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;padding:12px;background:var(--color-background-primary,#fff);color:var(--color-text-primary,#171717)}
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}.brand{font-weight:700;margin-right:auto}
+button{border:1px solid var(--color-border-primary,#bbb);border-radius:9px;padding:8px 11px;background:var(--color-background-secondary,#f3f3f3);color:inherit;font:inherit;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+#status{font-size:12px;color:var(--color-text-secondary,#666);min-height:18px;margin-bottom:8px}.stage{height:min(72vh,720px);min-height:320px;border:1px solid var(--color-border-primary,#bbb);border-radius:12px;overflow:hidden;background:#fff}
+iframe{display:block;width:100%;height:100%;border:0;background:white}.empty{height:100%;display:grid;place-items:center;padding:24px;text-align:center;color:#555}
+</style></head><body>
+<div class="bar"><div class="brand">FORGE-OS · Live Preview</div><button id="refresh" type="button">Refresh</button><button id="fullscreen" type="button">Expand</button></div>
+<div id="status" role="status" aria-live="polite">Waiting for preview data…</div>
+<div class="stage" id="stage"><div class="empty">Claude will load your committed project preview here.</div></div>
+<script>/*__EXT_APPS_BUNDLE__*/</script>
+<script>
+(() => {
+ const {App}=globalThis.ExtApps;
+ const app=new App({name:"FORGE-OS Live Preview",version:"1.0.0"},{},{autoResize:true});
+ const status=document.getElementById("status"),stage=document.getElementById("stage"),refreshButton=document.getElementById("refresh"),fullscreenButton=document.getElementById("fullscreen");
+ let current=null,version=null,refreshTimer=null,loading=false;
+ function say(message){status.textContent=message}
+ function escapeAttr(value){return String(value).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+ async function loadPreview(force=false){
+  if(!current||loading)return;loading=true;refreshButton.disabled=true;say("Loading committed preview…");
+  try{
+   const response=await fetch(current.preview_url,{cache:"no-store",credentials:"omit",redirect:"error"});
+   if(!response.ok)throw new Error("Preview request failed ("+response.status+").");
+   const source=await response.text();if(source.length>4*1024*1024)throw new Error("Preview HTML exceeds the 4 MiB display limit.");
+   const base=current.preview_url.slice(0,current.preview_url.lastIndexOf("/")+1);
+   const policy="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: https://forge-os-remote-mcp.majsjsj.workers.dev; style-src 'unsafe-inline' https://forge-os-remote-mcp.majsjsj.workers.dev; img-src data: blob: https://forge-os-remote-mcp.majsjsj.workers.dev; font-src data: https://forge-os-remote-mcp.majsjsj.workers.dev; media-src data: blob: https://forge-os-remote-mcp.majsjsj.workers.dev; connect-src https://forge-os-remote-mcp.majsjsj.workers.dev; worker-src blob: https://forge-os-remote-mcp.majsjsj.workers.dev; object-src 'none'; form-action 'none';";
+   const safeSource=source.replace(/<base\b[^>]*>/gi,"").replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy["']?[^>]*>/gi,"");
+   const injection='<meta http-equiv="Content-Security-Policy" content="'+escapeAttr(policy)+'"><base href="'+escapeAttr(base)+'">';
+   const rendered=/<head\b[^>]*>/i.test(safeSource)?safeSource.replace(/<head\b[^>]*>/i,match=>match+injection):injection+safeSource;
+   const frame=document.createElement("iframe");frame.setAttribute("title","Interactive project preview");frame.setAttribute("sandbox","allow-scripts allow-pointer-lock");frame.allowFullscreen=true;frame.setAttribute("referrerpolicy","no-referrer");frame.srcdoc=rendered;stage.replaceChildren(frame);
+   say("Preview loaded · "+(current.branch||"project branch")+(force?" · refreshed":""));
+  }catch(error){say("Preview unavailable: "+String(error&&error.message||error))}
+  finally{loading=false;refreshButton.disabled=false}
+ }
+ async function checkVersion(){
+  if(!current||!current.version_url||loading)return;
+  try{const response=await fetch(current.version_url,{cache:"no-store",credentials:"omit"});if(!response.ok)return;const data=await response.json();
+   if(data.version&&version&&data.version!==version){version=data.version;await loadPreview(true)}else if(data.version)version=data.version;
+  }catch(_){}
+ }
+ app.ontoolresult=async({content})=>{
+  const item=(content||[]).find(part=>part.type==="text"&&typeof part.text==="string");if(!item){say("The preview tool returned no preview data.");return}
+  try{const data=JSON.parse(item.text);
+   if(data.found===false){current=null;stage.replaceChildren();say(data.message||"No deployed game preview is available yet.");return}
+   if(!data.preview_url||!["https://forge-os-remote-mcp.majsjsj.workers.dev/preview/","https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/"].some(prefix=>data.preview_url.startsWith(prefix)))throw new Error("The server did not return a trusted FORGE preview URL.");
+   current=data;version=null;if(refreshTimer)clearInterval(refreshTimer);await loadPreview();await checkVersion();refreshTimer=setInterval(checkVersion,60000);
+  }catch(error){say("Invalid preview response: "+String(error&&error.message||error))}
+ };
+ refreshButton.addEventListener("click",()=>loadPreview(true));
+ fullscreenButton.addEventListener("click",()=>app.requestDisplayMode({mode:"fullscreen"}).catch(()=>say("Fullscreen is not available in this Claude view.")));
+ app.connect().catch(error=>say("Could not connect to Claude preview host: "+String(error&&error.message||error)));
+})();
+</script></body></html>
