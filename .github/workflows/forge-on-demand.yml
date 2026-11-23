@@ -22,7 +22,6 @@ on:
         description: Isolated project branch (defaults to the dispatch ref)
         required: false
         type: string
-        default: main
 
 permissions:
   contents: read
