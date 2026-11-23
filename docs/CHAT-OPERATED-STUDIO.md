@@ -82,3 +82,8 @@ The MCP tools `forge_project_context_read` and `forge_project_context_save` prov
 ## Specialist project orchestration
 
 The MCP tool `forge_project_plan` returns a dependency-ordered plan and role contracts for product, architecture, UX, platform engineering, QA, security, and release. It is a deterministic planning tool for the connected conversational model; it does not spawn independent models or execute project work. Approved plans can be saved as `FORGE_PLAN.json` with `forge_project_plan_save`, recovered with `forge_project_plan_read`, and tracked through `forge_project_task_update`. See [specialist planning and project orchestration](SPECIALIST-AGENTS.md) for the lifecycle and approval boundaries.
+
+
+## Read-only task monitoring
+
+The MCP tool `forge_project_task_monitor` provides an on-demand checkpoint for a saved project plan. It reports ready tasks, active tasks, tasks blocked by incomplete dependencies, completed tasks, and the latest plan SHA. Call it after recording progress or before choosing the next specialist task. It is read-only and never executes work, changes statuses, runs tests, or dispatches builds. Recurring schedules and background event listeners are not enabled.
