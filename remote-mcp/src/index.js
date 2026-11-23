@@ -1333,8 +1333,9 @@ async function callTool(name, args, env) {
         asset_paths: syncAssets ? assetPaths.join("\n") : ""
       } }),
     });
-    return { accepted: true, engine, project_path, branch, output,
-      message: "GitHub accepted the dispatch request. Query forge_latest_build after a short wait to obtain the run ID and status." };
+    return { accepted: true, engine, project_path, branch, output, sync_assets: syncAssets,
+      asset_paths: syncAssets ? assetPaths : [],
+      message: "GitHub accepted the dispatch request on the trusted main workflow ref. Query forge_latest_build after a short wait to obtain the run ID and status." };
   }
 
   if (name === "forge_latest_build") {
