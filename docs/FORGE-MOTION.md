@@ -5,6 +5,8 @@
 - Local rendered-video preview (user selects a video file; no upload).
 - Optional external audio track with play/pause/seek synchronization against preview time.
 - Caption cue editor with start/end time and text.
+- Caption cues and caption design settings are saved with the local project, included in project JSON export/import, and restored when reopening the workspace.
+- Clicking a caption row seeks the preview to that cue's start time.
 - SRT and WebVTT import/export.
 - Caption style controls: font, size, foreground/background colors, opacity, vertical position, entrance effect.
 - Optional approximate word-level cue splitting for karaoke-style highlighting.
