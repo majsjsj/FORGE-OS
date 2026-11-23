@@ -145,7 +145,7 @@ const TOOLS = [
       properties: {
         path: { type: "string" },
         branch: { type: "string", description: "Project branch; defaults to main." },
-        content: { type: "string" },
+        content: { type: "string", description: "UTF-8 text up to 2 MB." },
         expected_sha: { type: "string", description: "Required when updating an existing file; omit only when creating a new file." },
         confirm: { type: "boolean" },
       },
@@ -377,8 +377,8 @@ async function callTool(name, args, env) {
     const branch = validateProjectBranch(args.branch || "main");
     if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     if (args.confirm !== true) throw new Error("Write not performed: confirm=true is required after the user asks to create or edit project files.");
-    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 500000)
-      throw new Error("File content must be UTF-8 text no larger than 500 KB.");
+    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 2000000)
+      throw new Error("File content must be UTF-8 text no larger than 2 MB.");
     if (args.expected_sha !== undefined && (typeof args.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(args.expected_sha)))
       throw new Error("expected_sha must be a valid Git blob SHA.");
     const payload = { message: `FORGE: update ${path}`, content: encodeBase64Utf8(args.content), branch };
