@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify the integrity and safe paths of explicitly staged FORGE assets."""
 from __future__ import annotations
 
@@ -40,7 +39,7 @@ def verify_assets(project_path: str, project_branch: str, root: Path | None = No
     seen: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict):
-            raise ValueError("Invalid asset manifest entry.")
+            raise TypeError("Invalid asset manifest entry.")
         rel = entry.get("path")
         expected_size = entry.get("size_bytes")
         expected_hash = entry.get("sha256")
