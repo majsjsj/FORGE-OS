@@ -268,6 +268,44 @@ const TOOLS = [
     }, required: ["branch","project_path","asset_path","content_base64","confirm"], additionalProperties: false }
   },
   {
+    name: "forge_asset_multipart_start",
+    description: "Start a resumable multipart upload to the optional Cloudflare R2 bucket. Returns an upload_id; keep it until completion. Requires confirm=true and an isolated project branch.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" },
+      content_type: { type: "string" }
+      , confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","confirm"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_multipart_part",
+    description: "Upload one part (1–10 MiB decoded) to an existing R2 multipart upload. Use sequential part numbers starting at 1; retain each returned etag for completion. Requires confirm=true.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" },
+      upload_id: { type: "string" }, part_number: { type: "integer", minimum: 1, maximum: 10000 },
+      content_base64: { type: "string" }, is_last_part: { type: "boolean", description: "Set true only for the final part; all earlier parts must be at least 5 MiB." }, confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","upload_id","part_number","content_base64","is_last_part","confirm"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_multipart_complete",
+    description: "Complete an R2 multipart upload using the exact part_number/etag pairs returned by forge_asset_multipart_part. Requires confirm=true. The completed object becomes available through forge_asset_download_url.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" },
+      upload_id: { type: "string" },
+      parts: { type: "array", minItems: 1, maxItems: 10000, items: { type: "object", properties: {
+        part_number: { type: "integer", minimum: 1, maximum: 10000 }, etag: { type: "string" }
+      }, required: ["part_number","etag"], additionalProperties: false } },
+      confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","upload_id","parts","confirm"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_multipart_abort",
+    description: "Abort an incomplete R2 multipart upload and discard its uploaded parts. Requires confirm=true.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" },
+      upload_id: { type: "string" }, confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","upload_id","confirm"], additionalProperties: false }
+  },
+  {
     name: "forge_asset_list",
     description: "List assets stored outside GitHub for one project branch. Requires the optional Cloudflare R2 asset bucket. Read-only.",
     inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" } }, required: ["branch","project_path"], additionalProperties: false }
@@ -689,7 +727,7 @@ async function callTool(name, args, env) {
     return { run_id: runId, job_id: jobId, truncated: logs.length > 20000, logs: logs.slice(-20000) };
   }
 
-  if (name === "forge_asset_upload" || name === "forge_asset_list" || name === "forge_asset_delete" || name === "forge_asset_download_url") {
+  if (["forge_asset_upload","forge_asset_list","forge_asset_delete","forge_asset_download_url","forge_asset_multipart_start","forge_asset_multipart_part","forge_asset_multipart_complete","forge_asset_multipart_abort"].includes(name)) {
     const bucket = env.FORGE_ASSETS_BUCKET;
     if (!bucket || typeof bucket.put !== "function") throw new Error("External asset storage is not configured. Create a Cloudflare R2 bucket and bind it to this Worker as FORGE_ASSETS_BUCKET; see docs/ASSET-STORAGE.md. No asset was changed.");
     const branch = validateProjectBranch(args.branch);
@@ -700,12 +738,58 @@ async function callTool(name, args, env) {
     if (assetPath && (typeof assetPath !== "string" || !/^[A-Za-z0-9._/-]+$/.test(assetPath) || assetPath.startsWith("/") || assetPath.includes("..") || assetPath.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))))
       throw new Error("asset_path must be a safe relative path without hidden or traversal segments.");
     const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
+    const key = prefix + assetPath;
+    if (name.startsWith("forge_asset_multipart_")) {
+      if (args.confirm !== true) throw new Error("Multipart operation not performed: confirm=true is required.");
+      if (typeof args.upload_id !== "string" && name !== "forge_asset_multipart_start")
+        throw new Error("A valid upload_id is required.");
+      if (name === "forge_asset_multipart_start") {
+        if (typeof bucket.createMultipartUpload !== "function") throw new Error("This R2 binding does not support multipart uploads.");
+        const type = typeof args.content_type === "string" && args.content_type.length <= 128 ? args.content_type : "application/octet-stream";
+        const upload = await bucket.createMultipartUpload(key, {
+          httpMetadata: { contentType: type },
+          customMetadata: { branch, project_path: project, asset_path: assetPath }
+        });
+        return { started: true, branch, project_path: project, asset_path: assetPath, upload_id: upload.uploadId,
+          note: "Keep upload_id and every returned part etag. Upload sequential parts, then call forge_asset_multipart_complete. Incomplete uploads should be completed or explicitly aborted." };
+      }
+      if (args.upload_id.length < 1 || args.upload_id.length > 2048) throw new Error("Invalid upload_id.");
+      if (typeof bucket.resumeMultipartUpload !== "function") throw new Error("This R2 binding does not support multipart uploads.");
+      const upload = bucket.resumeMultipartUpload(key, args.upload_id);
+      if (name === "forge_asset_multipart_part") {
+        const n = Number(args.part_number);
+        if (!Number.isInteger(n) || n < 1 || n > 10000) throw new Error("part_number must be between 1 and 10000.");
+        if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 14913080)
+          throw new Error("Each part must contain non-empty base64 data no larger than 10 MiB decoded.");
+        const raw = atob(args.content_base64.replace(/\s/g,""));
+        if (raw.length > 10 * 1024 * 1024 || raw.length < 1) throw new Error("Each part must be between 1 byte and 10 MiB.");
+        if (args.is_last_part !== true && raw.length < 5 * 1024 * 1024)
+          throw new Error("Every non-final R2 multipart part must be at least 5 MiB. Set is_last_part=true only for the final part.");
+        const bytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
+        const result = await upload.uploadPart(n, bytes);
+        return { uploaded: true, part_number: n, etag: result.etag, size_bytes: bytes.length, upload_id: args.upload_id };
+      }
+      if (name === "forge_asset_multipart_complete") {
+        if (!Array.isArray(args.parts) || !args.parts.length || args.parts.length > 10000) throw new Error("Provide 1–10000 uploaded parts.");
+        const parts = args.parts.map(p => ({ partNumber: Number(p.part_number), etag: p.etag }));
+        for (let i=0;i<parts.length;i++) {
+          if (!Number.isInteger(parts[i].partNumber) || parts[i].partNumber !== i+1 || typeof parts[i].etag !== "string" || !parts[i].etag.length || parts[i].etag.length > 256)
+            throw new Error("Parts must be sequential from 1 and use the exact etag returned for each part.");
+        }
+        const result = await upload.complete(parts);
+        return { completed: true, branch, project_path: project, asset_path: assetPath, size_bytes: result.size, etag: result.etag,
+          note: "Multipart asset is stored in R2. Use forge_asset_download_url to obtain a temporary download URL." };
+      }
+      if (name === "forge_asset_multipart_abort") {
+        await upload.abort();
+        return { aborted: true, branch, project_path: project, asset_path: assetPath, upload_id: args.upload_id };
+      }
+    }
     if (name === "forge_asset_list") {
       const listed = await bucket.list({ prefix, limit: 1000, cursor: typeof args.cursor === "string" ? args.cursor : undefined });
       return { branch, project_path: project, assets: (listed.objects || []).map(o => ({ asset_path: o.key.slice(prefix.length), size_bytes: o.size, uploaded: o.uploaded, etag: o.etag })), truncated: Boolean(listed.truncated), cursor: listed.truncated ? listed.cursor : null };
     }
     if (!assetPath) throw new Error("asset_path is required.");
-    const key = prefix + assetPath;
     if (name === "forge_asset_delete") {
       if (args.confirm !== true) throw new Error("Asset deletion not performed: confirm=true is required after the user explicitly requests deletion.");
       await bucket.delete(key);

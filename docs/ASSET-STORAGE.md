@@ -15,6 +15,10 @@ If the binding is absent, the asset tools return a clear configuration error and
 ## Asset tools
 
 - `forge_asset_upload`: upload one base64-encoded binary file to the selected project's external asset namespace. Requires `confirm=true`; maximum decoded size is 32 MiB per call.
+- `forge_asset_multipart_start`: create a resumable R2 multipart upload and return an `upload_id`.
+- `forge_asset_multipart_part`: upload one part (up to 10 MiB decoded) and return its `etag`. Use sequential part numbers starting at 1. Set `is_last_part=true` only on the final part. R2 requires every non-final part to be at least 5 MiB; use 8 MiB parts for a safe default and a smaller final part if needed.
+- `forge_asset_multipart_complete`: finalize the object using the exact ordered part-number/etag pairs returned by the part tool.
+- `forge_asset_multipart_abort`: explicitly discard an incomplete upload.
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
 - `forge_asset_download_url`: create an HMAC-signed, read-only URL that expires after one hour.
 - `forge_asset_delete`: explicitly delete one object; requires `confirm=true`.
@@ -25,4 +29,4 @@ Objects are namespaced by isolated project branch and project path. They are not
 
 External storage is now available as an optional independent asset store, but the build workflows do not yet automatically synchronize R2 assets into a project before compiling. For a build that needs an asset, download it into the project workspace first and commit it to the project branch, or use a future build-sync integration. Do not assume a successful upload alone makes an asset available inside an APK/AAB/Web build.
 
-The current upload API accepts up to 32 MiB per file per call. It does not yet implement resumable multipart uploads, automatic deduplication, lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
+The single-request upload API accepts up to 32 MiB per file per call. Larger files can use R2 multipart uploads: start once, upload sequential parts, then complete with the returned etags. Keep the `upload_id` and etags until completion; if an upload is no longer needed, call the abort tool. Incomplete multipart uploads may remain billable until aborted or removed by an owner-configured R2 lifecycle rule. The implementation does not yet provide automatic deduplication, automatic lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
