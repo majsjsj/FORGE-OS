@@ -39,6 +39,10 @@ Cloudflare account and free-plan limits apply; check current limits before use. 
 
 If the first deployment fails because the API token cannot create a new Worker, use the minimum Cloudflare permission required by its current dashboard/API for initial creation, then narrow the token to Editor access for the existing Worker where supported. Never put credentials in repository files or chat messages.
 
+## Optional external asset storage
+
+See [Asset Storage](ASSET-STORAGE.md) to configure an optional Cloudflare R2 bucket binding named `FORGE_ASSETS_BUCKET`. This is not enabled by default and may incur charges beyond Cloudflare's current free allowance. The asset tools are unavailable until the binding is configured. Uploads are stored outside GitHub; build workflows do not yet auto-sync them into projects.
+
 ## Connect Claude
 
 On Claude web, open **Customize → Connectors → Add → Custom → Web** (wording may vary). Enter the Worker URL ending in `/mcp`. Choose fixed request-header authentication and configure:
