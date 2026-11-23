@@ -697,11 +697,11 @@ async function callTool(name, args, env) {
     const project = validateWorkspacePath(args.project_path, true);
     if (project === "workspace") throw new Error("Choose a project directory inside workspace/.");
     const assetPath = args.asset_path === undefined ? "" : args.asset_path;
-    if (assetPath && (typeof assetPath !== "string" || !/^[A-Za-z0-9._/-]+$/.test(assetPath) || assetPath.startsWith("/") || assetPath.includes("..") || assetPath.split("/").some(part => !part || part.startsWith("."))))
+    if (assetPath && (typeof assetPath !== "string" || !/^[A-Za-z0-9._/-]+$/.test(assetPath) || assetPath.startsWith("/") || assetPath.includes("..") || assetPath.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))))
       throw new Error("asset_path must be a safe relative path without hidden or traversal segments.");
     const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
     if (name === "forge_asset_list") {
-      const listed = await bucket.list({ prefix, limit: 1000 });
+      const listed = await bucket.list({ prefix, limit: 1000, cursor: typeof args.cursor === "string" ? args.cursor : undefined });
       return { branch, project_path: project, assets: (listed.objects || []).map(o => ({ asset_path: o.key.slice(prefix.length), size_bytes: o.size, uploaded: o.uploaded, etag: o.etag })), truncated: Boolean(listed.truncated), cursor: listed.truncated ? listed.cursor : null };
     }
     if (!assetPath) throw new Error("asset_path is required.");
@@ -713,7 +713,7 @@ async function callTool(name, args, env) {
     }
     if (name === "forge_asset_upload") {
       if (args.confirm !== true) throw new Error("Asset upload not performed: confirm=true is required after the user explicitly requests upload.");
-      if (typeof args.content_base64 !== "string" || !args.content_base64.length) throw new Error("content_base64 must be a non-empty base64 string.");
+      if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 22369624) throw new Error("content_base64 must be a non-empty base64 string representing no more than 16 MiB.");
       const raw = atob(args.content_base64.replace(/\s/g, ""));
       if (raw.length > 16 * 1024 * 1024) throw new Error("One asset upload is limited to 16 MiB decoded. Split or compress the asset before upload.");
       const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
