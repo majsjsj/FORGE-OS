@@ -145,7 +145,7 @@ const TOOLS = [
       properties: {
         path: { type: "string" },
         branch: { type: "string", description: "Project branch; defaults to main." },
-        content: { type: "string", description: "UTF-8 text up to 2 MB." },
+        content: { type: "string", description: "UTF-8 text up to 4 MB." },
         expected_sha: { type: "string", description: "Required when updating an existing file; omit only when creating a new file." },
         confirm: { type: "boolean" },
       },
@@ -165,7 +165,7 @@ const TOOLS = [
   },
   {
     name: "forge_workspace_batch_write",
-    description: "Atomically create or update up to 100 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
+    description: "Atomically create or update up to 150 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
       type: "object",
       properties: {
@@ -173,7 +173,7 @@ const TOOLS = [
         files: {
           type: "array",
           minItems: 1,
-          maxItems: 100,
+          maxItems: 150,
           items: {
             type: "object",
             properties: {
@@ -257,7 +257,7 @@ const TOOLS = [
   { name: "forge_cloud_logs", description: "Read the tail of logs for a job belonging to a cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, job_id: { type: "integer" } }, required: ["run_id", "job_id"], additionalProperties: false } },
   {
     name: "forge_asset_upload",
-    description: "Upload one binary asset (image, audio, font, model, archive, or game resource) to the optional Cloudflare R2 asset bucket, outside GitHub. Requires an existing forge/projects/ branch, a path inside the selected workspace project, base64 data, and confirm=true. Maximum decoded size is 16 MiB per upload. Returns a temporary signed download URL. Requires the owner to configure the FORGE_ASSETS_BUCKET R2 binding.",
+    description: "Upload one binary asset (image, audio, font, model, archive, or game resource) to the optional Cloudflare R2 asset bucket, outside GitHub. Requires an existing forge/projects/ branch, a path inside the selected workspace project, base64 data, and confirm=true. Maximum decoded size is 32 MiB per upload. Returns a temporary signed download URL. Requires the owner to configure the FORGE_ASSETS_BUCKET R2 binding.",
     inputSchema: { type: "object", properties: {
       branch: { type: "string" },
       project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
@@ -404,8 +404,8 @@ async function callTool(name, args, env) {
     const branch = validateProjectBranch(args.branch || "main");
     if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     if (args.confirm !== true) throw new Error("Write not performed: confirm=true is required after the user asks to create or edit project files.");
-    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 2000000)
-      throw new Error("File content must be UTF-8 text no larger than 2 MB.");
+    if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 4000000)
+      throw new Error("File content must be UTF-8 text no larger than 4 MB.");
     if (args.expected_sha !== undefined && (typeof args.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(args.expected_sha)))
       throw new Error("expected_sha must be a valid Git blob SHA.");
     const payload = { message: `FORGE: update ${path}`, content: encodeBase64Utf8(args.content), branch };
@@ -486,8 +486,8 @@ async function callTool(name, args, env) {
 
   if (name === "forge_workspace_batch_write") {
     if (args.confirm !== true) throw new Error("Batch write not performed: confirm=true is required after the user asks for these project edits.");
-    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 100)
-      throw new Error("files must contain between 1 and 100 file entries.");
+    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 150)
+      throw new Error("files must contain between 1 and 150 file entries.");
     const branch = validateProjectBranch(args.branch || "main");
     if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     const seen = new Set();
@@ -500,12 +500,12 @@ async function callTool(name, args, env) {
       if (typeof file.content !== "string" || file.content.includes("\0"))
         throw new Error("Each file must contain valid UTF-8 text without NUL bytes.");
       const size = new TextEncoder().encode(file.content).length;
-      if (size > 2000000) throw new Error("Each text file must be no larger than 2 MB: " + file.path);
+      if (size > 4000000) throw new Error("Each text file must be no larger than 4 MB: " + file.path);
       totalBytes += size;
       if (file.expected_sha !== undefined && (typeof file.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(file.expected_sha)))
         throw new Error("Invalid expected_sha for " + file.path);
     }
-    if (totalBytes > 10000000) throw new Error("The complete atomic batch must be no larger than 10 MB. Use multiple batches or a cloud session for larger projects.");
+    if (totalBytes > 20000000) throw new Error("The complete atomic batch must be no larger than 20 MB. Use multiple batches or a cloud session for larger projects.");
     const parent = await branchHead(env, branch);
     const commit = await github(env, "git/commits/" + parent);
     const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
@@ -713,9 +713,9 @@ async function callTool(name, args, env) {
     }
     if (name === "forge_asset_upload") {
       if (args.confirm !== true) throw new Error("Asset upload not performed: confirm=true is required after the user explicitly requests upload.");
-      if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 22369624) throw new Error("content_base64 must be a non-empty base64 string representing no more than 16 MiB.");
+      if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 44739244) throw new Error("content_base64 must be a non-empty base64 string representing no more than 32 MiB.");
       const raw = atob(args.content_base64.replace(/\s/g, ""));
-      if (raw.length > 16 * 1024 * 1024) throw new Error("One asset upload is limited to 16 MiB decoded. Split or compress the asset before upload.");
+      if (raw.length > 32 * 1024 * 1024) throw new Error("One asset upload is limited to 32 MiB decoded. Split or compress the asset before upload.");
       const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
       const type = typeof args.content_type === "string" && args.content_type.length <= 128 ? args.content_type : "application/octet-stream";
       await bucket.put(key, bytes, { httpMetadata: { contentType: type }, customMetadata: { branch, project_path: project, asset_path: assetPath } });
