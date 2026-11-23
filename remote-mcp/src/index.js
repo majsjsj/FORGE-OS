@@ -282,8 +282,8 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {
       branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" },
       upload_id: { type: "string" }, part_number: { type: "integer", minimum: 1, maximum: 10000 },
-      content_base64: { type: "string" }, confirm: { type: "boolean" }
-    }, required: ["branch","project_path","asset_path","upload_id","part_number","content_base64","confirm"], additionalProperties: false }
+      content_base64: { type: "string" }, is_last_part: { type: "boolean", description: "Set true only for the final part; all earlier parts must be at least 5 MiB." }, confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","upload_id","part_number","content_base64","is_last_part","confirm"], additionalProperties: false }
   },
   {
     name: "forge_asset_multipart_complete",
@@ -761,7 +761,9 @@ async function callTool(name, args, env) {
         if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 14913080)
           throw new Error("Each part must contain non-empty base64 data no larger than 10 MiB decoded.");
         const raw = atob(args.content_base64.replace(/\\s/g,""));
-        if (raw.length > 10 * 1024 * 1024 || raw.length < 1) throw new Error("Each part must be between 1 byte and 10 MiB; non-final R2 parts must be at least 5 MiB.");
+        if (raw.length > 10 * 1024 * 1024 || raw.length < 1) throw new Error("Each part must be between 1 byte and 10 MiB.");
+        if (args.is_last_part !== true && raw.length < 5 * 1024 * 1024)
+          throw new Error("Every non-final R2 multipart part must be at least 5 MiB. Set is_last_part=true only for the final part.");
         const bytes = Uint8Array.from(raw, ch => ch.charCodeAt(0));
         const result = await upload.uploadPart(n, bytes);
         return { uploaded: true, part_number: n, etag: result.etag, size_bytes: bytes.length, upload_id: args.upload_id };
