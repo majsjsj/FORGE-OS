@@ -35,5 +35,7 @@ jobs:
           grep -q 'studio/advanced-tools.js _site/studio/' .github/workflows/forge-on-demand.yml
       - name: Check remote MCP Worker JavaScript
         run: node --check remote-mcp/src/index.js
+      - name: Test remote MCP Worker signed asset routes
+        run: node --test remote-mcp/test/*.test.js
       - name: Check artifact manifest verifier Python syntax
         run: python -m py_compile scripts/verify-forge-artifact.py
