@@ -221,7 +221,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@d947420bb3dd4fa932911d7d3d4ea72c0d8b3d73
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@409082e725a53abc144790a3e00a4509815c64cf
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -401,7 +401,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@d947420bb3dd4fa932911d7d3d4ea72c0d8b3d73
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@409082e725a53abc144790a3e00a4509815c64cf
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -609,7 +609,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@d947420bb3dd4fa932911d7d3d4ea72c0d8b3d73
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@409082e725a53abc144790a3e00a4509815c64cf
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -874,7 +874,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@d947420bb3dd4fa932911d7d3d4ea72c0d8b3d73
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@409082e725a53abc144790a3e00a4509815c64cf
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
