@@ -164,6 +164,19 @@ const TOOLS = [
     },
   },
   {
+    name: "forge_project_preflight",
+    description: "Run a read-only release-readiness preflight against committed project files. Detects missing engine manifests and likely entry points, reports structural warnings, and recommends the next safe action. Does not execute code, install dependencies, consume Actions quota, or build.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Project directory such as workspace/my-app." },
+        branch: { type: "string", description: "Existing project branch; defaults to main." }
+      },
+      required: ["project_path"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_workspace_batch_write",
     description: "Atomically create or update up to 150 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
@@ -524,6 +537,56 @@ async function callTool(name, args, env) {
       manifests_found: manifests,
       likely_entry_points: entryCandidates,
       note: "Read-only inventory of committed files on the selected branch. No project code was executed and no build was started."
+    };
+  }
+
+  if (name === "forge_project_preflight") {
+    const report = await callTool("forge_project_inspect", {
+      project_path: args.project_path,
+      branch: args.branch || "main"
+    }, env);
+    const paths = new Set(report.files.map(file => file.path.slice(report.project_path.length + 1)));
+    const has = path => paths.has(path);
+    const findings = [];
+    const add = (severity, code, message) => findings.push({ severity, code, message });
+    if (report.engine === "Godot") {
+      if (!has("project.godot")) add("blocker", "godot_manifest_missing", "project.godot is missing.");
+      else add("info", "godot_manifest_found", "Godot project manifest is present; verify the configured main scene and export presets in an engine run.");
+    } else if (report.engine === "Unity") {
+      if (!has("ProjectSettings/ProjectVersion.txt")) add("warning", "unity_version_missing", "ProjectSettings/ProjectVersion.txt was not found; Unity version detection may be unreliable.");
+      if (![...paths].some(path => path.startsWith("Assets/"))) add("blocker", "unity_assets_missing", "No Assets/ project content was found.");
+      else add("info", "unity_assets_found", "Unity Assets/ content is present.");
+    } else if (report.engine === "Flutter") {
+      if (!has("pubspec.yaml")) add("blocker", "flutter_manifest_missing", "pubspec.yaml is missing.");
+      if (!has("lib/main.dart")) add("blocker", "flutter_entry_missing", "lib/main.dart is missing.");
+      else add("info", "flutter_entry_found", "Flutter entry point lib/main.dart is present.");
+    } else if (report.engine === "Web" || report.engine === "Web / Node.js") {
+      if (!has("index.html") && !has("src/main.js") && !has("src/main.ts") && !has("src/main.tsx") && !has("src/App.jsx") && !has("src/App.tsx"))
+        add("blocker", "web_entry_missing", "No common web entry point was found.");
+      if (report.engine === "Web / Node.js" && !has("package-lock.json") && !has("pnpm-lock.yaml") && !has("yarn.lock"))
+        add("warning", "lockfile_missing", "No dependency lockfile was found; reproducible installs are less reliable.");
+      add("info", "web_static_checks_only", "This preflight does not install dependencies, execute tests, or launch a browser.");
+    } else {
+      add("warning", "engine_unrecognized", "The project engine could not be confidently identified from its committed manifests.");
+    }
+    if (report.file_count > 250) add("warning", "large_file_inventory", "The project contains more than 250 files; inspect the full inventory before release.");
+    if (report.total_source_bytes > 50 * 1024 * 1024) add("warning", "large_source_tree", "The committed project exceeds 50 MiB; consider external asset storage for large binaries.");
+    if (!findings.length) add("info", "basic_structure_found", "No missing structural requirements were detected by this limited preflight.");
+    const blockers = findings.filter(item => item.severity === "blocker").length;
+    const warnings = findings.filter(item => item.severity === "warning").length;
+    return {
+      project_path: report.project_path,
+      branch: report.branch,
+      engine: report.engine,
+      framework: report.framework,
+      readiness: blockers ? "blocked" : warnings ? "ready_with_warnings" : "structurally_ready",
+      blockers,
+      warnings,
+      findings,
+      next_actions: blockers
+        ? ["Resolve all blocker findings, commit the fixes, then run preflight again."]
+        : ["Run the engine-specific test workflow on explicit request.", "Review warnings and verify the application in a real browser or device before release."],
+      limitations: ["Read-only structural analysis only.", "No project code was executed.", "No dependencies were installed.", "No build or device test was started."]
     };
   }
 
