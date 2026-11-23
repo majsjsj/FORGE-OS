@@ -1,12 +1,13 @@
 # FORGE-OS
 
-**FORGE-OS** is a model-agnostic AI development workspace. It is designed to work with Claude through MCP, or with a separately hosted model through the FORGE AI gateway.
+**FORGE-OS** is a model-agnostic AI creation workspace. It is designed to work with Claude through MCP, or with a separately hosted model through the FORGE AI gateway.
 
 ## Current foundation
 
 - FORGE Director: deterministic project classification, task breakdown, and specialist-agent routing (planning only).
 - Project studios and scaffolds for web, Android, Flutter, browser games, Unity, Godot, SaaS, and APIs.
 - A clean, project-agnostic browser workspace with Monaco editing, a sandboxed preview, and desktop/mobile viewport sizing.
+- **FORGE MOTION:** a creative-production workspace for voice-led video planning, 2D/3D animation, stickman, product advertising, Blender-oriented shot design, camera direction, sound notes, and an editable storyboard/timeline. The current milestone exports a production-plan JSON; it does not yet render finished MP4/video.
 - Mobile build pipeline: local toolchain detection and guarded APK/AAB build adapters for Gradle/Flutter, plus Unity/Godot Android export entry points.
 - Google Play preparation: listing metadata and a human-review release checklist.
 - AdMob planning: platform-specific setup plans with test-mode placeholders; no live ad IDs or automatic publishing.
@@ -14,6 +15,10 @@
 - Repair engine: bounded verification/repair-loop primitive with caller-supplied callbacks.
 - FORGE AI gateway: OpenAI-compatible endpoint adapter for local models.
 - MCP server, CLI, workspace-scoped file operations, tests, and Claude Code skills.
+
+## FORGE MOTION
+
+Open [FORGE MOTION](studio/motion/index.html) for the creative-production workspace. Read [the production architecture and capability gates](docs/FORGE-MOTION.md) before connecting render services. The workspace currently supports editable briefs, starter shot breakdowns, scene/camera/action/lighting/audio metadata, a timeline view, local persistence, audio reference preview, and JSON project import/export. Speech recognition, AI provider calls, Blender rendering, 2D/3D animation rendering, and final video export are planned integrations and are not yet active.
 
 ## Install
 
@@ -77,5 +82,3 @@ The stdio MCP server exposes project inspection, safe file operations, planning/
 ## Honest capability boundaries
 
 This release is a functional foundation, not a fully autonomous software factory. Director routing does not yet execute independent agents. Studio templates are starters, not production apps. Vision currently performs pixel-level comparison, not semantic image understanding or automatic image-to-UI conversion. The repair loop needs an external trusted repair callback. The model gateway connects to an existing model; it does not train FORGE weights.
-
-See [mobile and game pipeline](docs/MOBILE-GAME-PIPELINE.md), [architecture](docs/ARCHITECTURE.md), [studios](docs/STUDIOS.md), [vision and repair](docs/VISION-AND-REPAIR.md), and [roadmap](docs/ROADMAP.md).
