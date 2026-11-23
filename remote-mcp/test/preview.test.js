@@ -83,7 +83,7 @@ test("MCP Apps preview resource is discoverable and safely bundled", async () =>
   assert.equal(resource.mimeType, "text/html;profile=mcp-app");
   assert.match(resource.text, /globalThis\.ExtApps/);
   assert.match(resource.text, /sandbox", "allow-scripts"/);
-  assert.match(resource.text, /setInterval\(checkVersion,15000\)/);
+  assert.match(resource.text, /setInterval\(checkVersion,60000\)/);
   assert.doesNotMatch(resource.text, /__EXT_APPS_BUNDLE__/);
   assert.equal(resource._meta.ui.prefersBorder, false);
 
