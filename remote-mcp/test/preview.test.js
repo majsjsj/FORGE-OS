@@ -82,7 +82,7 @@ test("MCP Apps preview resource is discoverable and safely bundled", async () =>
   const resource = read.body.result.contents[0];
   assert.equal(resource.mimeType, "text/html;profile=mcp-app");
   assert.match(resource.text, /globalThis\.ExtApps/);
-  assert.match(resource.text, /sandbox", "allow-scripts"/);
+  assert.match(resource.text, /sandbox", "allow-scripts allow-pointer-lock"/);
   assert.match(resource.text, /setInterval\(checkVersion,60000\)/);
   assert.doesNotMatch(resource.text, /__EXT_APPS_BUNDLE__/);
   assert.equal(resource._meta.ui.prefersBorder, false);
@@ -110,7 +110,7 @@ test("deployed game previews are proxied from the fixed Pages origin", async () 
   };
   try {
     const response = await worker.fetch(new Request(
-      "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/index.html?run_id=123"
+      "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/123/index.html"
     ), {});
     assert.equal(response.status, 200);
     assert.equal(requested, "https://majsjsj.github.io/FORGE-OS/game-preview/index.html");
