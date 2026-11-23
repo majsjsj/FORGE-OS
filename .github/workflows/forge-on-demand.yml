@@ -41,6 +41,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.project_branch || github.ref }}
+          persist-credentials: false
       - name: Validate project path
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
@@ -49,28 +50,72 @@ jobs:
           import os
           from pathlib import Path
           p = Path(os.environ["PROJECT_PATH"])
-          if p.is_absolute() or ".." in p.parts or not (Path.cwd()/p).resolve().is_relative_to(Path.cwd()):
+          root = Path.cwd().resolve()
+          resolved = (root / p).resolve()
+          if p.is_absolute() or ".." in p.parts or not resolved.is_relative_to(root):
               raise SystemExit("Unsafe project path")
-          if not (Path.cwd()/p).is_dir():
+          if not resolved.is_dir():
               raise SystemExit("Project directory not found")
           PY
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Run available web checks
+      - name: Test and build web project
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
+          OUTPUT: ${{ inputs.output }}
         run: |
+          set -euo pipefail
           cd "$PROJECT_PATH"
-          if [ -f package.json ]; then npm ci --ignore-scripts && npm test --if-present && npm run build --if-present;
-          elif [ -f index.html ]; then test -s index.html;
-          else echo "No supported web project manifest or index.html"; exit 1; fi
+          if [ -f package.json ]; then
+            if [ -f package-lock.json ]; then npm ci --ignore-scripts;
+            else npm install --ignore-scripts; fi
+            npm test --if-present
+            if [ "$OUTPUT" = "web" ]; then npm run build --if-present; fi
+          elif [ ! -s index.html ]; then
+            echo "::error::Expected package.json or a non-empty index.html."
+            exit 1
+          fi
+          if [ "$OUTPUT" = "test" ]; then
+            echo "Web project checks completed; no source archive will be uploaded."
+            exit 0
+          fi
+          if [ "$OUTPUT" != "web" ]; then
+            echo "::error::Web engine supports only test or web output."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/forge-web-output"
+          if [ -s dist/index.html ]; then
+            cp -a dist/. "$RUNNER_TEMP/forge-web-output/"
+          elif [ -s build/index.html ]; then
+            cp -a build/. "$RUNNER_TEMP/forge-web-output/"
+          elif [ -s out/index.html ]; then
+            cp -a out/. "$RUNNER_TEMP/forge-web-output/"
+          elif [ -s index.html ]; then
+            rsync -a \
+              --exclude='.git/' \
+              --exclude='.github/' \
+              --exclude='node_modules/' \
+              --exclude='.cache/' \
+              --exclude='.next/' \
+              --exclude='.dart_tool/' \
+              --exclude='.godot/' \
+              --exclude='dist/' \
+              --exclude='build/' \
+              --exclude='out/' \
+              ./ "$RUNNER_TEMP/forge-web-output/"
+          else
+            echo "::error::No deployable index.html found. Expected dist/, build/, out/, or project-root index.html."
+            exit 1
+          fi
+          test -s "$RUNNER_TEMP/forge-web-output/index.html"
+          echo "Prepared deployable web output only; dependencies and repository metadata are excluded."
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: success() && inputs.output == 'web'
         with:
-          name: forge-web-results
-          path: ${{ inputs.project_path }}
-          if-no-files-found: ignore
+          name: forge-web
+          path: ${{ runner.temp }}/forge-web-output/**
+          if-no-files-found: error
           retention-days: 3
 
   flutter:
