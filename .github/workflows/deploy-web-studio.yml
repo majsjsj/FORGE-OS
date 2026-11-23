@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir -p _site/studio _site/workspace/blank-project
           cp site/index.html _site/index.html
-          cp studio/index.html studio/studio.css studio/studio.js _site/studio/
+          cp studio/index.html studio/studio.css studio/studio.js studio/features.js _site/studio/
           cp workspace/blank-project/index.html workspace/blank-project/styles.css workspace/blank-project/script.js _site/workspace/blank-project/
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
