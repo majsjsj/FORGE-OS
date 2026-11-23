@@ -698,7 +698,8 @@ const TOOLS = [
   },
   {
     name: "forge_game_preview_url",
-    description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return the playable browser preview URL. Read-only; does not start a build.",
+    description: "Find the latest successful Godot or Unity Web export workflow that also completed its GitHub Pages deployment, and return its playable inline MCP App preview in Claude. Read-only; does not start a build.",
+    _meta: { ui: { resourceUri: "ui://forge-os/live-preview.html" } },
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -1391,7 +1392,7 @@ async function callTool(name, args, env) {
       if (!artifact) continue;
       return { found: true, engine: artifact.name.startsWith("forge-godot") ? "Godot" : "Unity",
         run_id: run.id, run_url: run.html_url, artifact_name: artifact.name,
-        preview_url: "https://majsjsj.github.io/FORGE-OS/game-preview/",
+        preview_url: "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/index.html?run_id=" + run.id,
         note: "This URL serves the latest successful Web build that completed the preview-site deployment. It is interactive in a browser; Android APK/AAB files are not browser previews." };
     }
     return { found: false, message: "No successful Godot or Unity Web build with a completed Pages deployment was found yet. Request an authorized Web build first." };
@@ -1839,9 +1840,49 @@ async function callTool(name, args, env) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
+
+async function handleGamePreview(request, url) {
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return new Response("Method not allowed", { status: 405 });
+  let path;
+  try {
+    path = decodeURIComponent(url.pathname.slice("/game-preview/".length));
+    if (!path) path = "index.html";
+    if (path.length > 500 || !/^[A-Za-z0-9._/-]+$/.test(path) || path.includes("\\\\") ||
+        path.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")))
+      throw new Error("Unsafe game preview path.");
+  } catch {
+    return new Response("Invalid game preview path.", { status: 400 });
+  }
+  const upstreamPath = path.split("/").map(encodeURIComponent).join("/");
+  let upstream;
+  try {
+    upstream = await fetch("https://majsjsj.github.io/FORGE-OS/game-preview/" + upstreamPath, {
+      method: request.method, redirect: "error",
+      headers: { accept: request.headers.get("accept") || "*/*" }
+    });
+  } catch {
+    return new Response("Game preview upstream is unavailable.", { status: 502 });
+  }
+  const headers = new Headers(upstream.headers);
+  headers.set("cache-control", "no-store");
+  headers.set("access-control-allow-origin", "*");
+  headers.set("cross-origin-resource-policy", "cross-origin");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "no-referrer");
+  if (path.toLowerCase().endsWith(".html")) {
+    headers.set("content-type", "text/html; charset=utf-8");
+    headers.set("content-security-policy", "sandbox allow-scripts");
+  }
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status, headers
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/game-preview/")) return handleGamePreview(request, url);
     if (url.pathname === "/actions/assets") return handleActionsAssetSync(request, env);
     if (url.pathname.startsWith("/assets/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
