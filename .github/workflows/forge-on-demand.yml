@@ -131,7 +131,7 @@ jobs:
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
-          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
       - uses: actions/upload-artifact@v4
@@ -267,7 +267,7 @@ jobs:
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
-          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
       - uses: actions/upload-artifact@v4
@@ -460,7 +460,7 @@ jobs:
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
-          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
       - uses: actions/upload-artifact@v4
@@ -582,7 +582,7 @@ jobs:
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
-          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           print(f"Manifest created for {len(files)} files.")
           PY
       - uses: actions/upload-artifact@v4
