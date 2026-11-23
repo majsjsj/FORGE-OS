@@ -211,4 +211,22 @@ test("project plan storage rejects main branch and invalid dependency graphs", a
   assert.equal(invalid.payload.result.isError, true);
   assert.match(invalid.payload.result.content[0].text, /invalid task dependency/);
   assert.equal(invalid.requests, 0);
+
+  const cyclicPlan = samplePlan();
+  cyclicPlan.tasks[0].depends_on = ["P2"];
+  const cyclic = await callTool("forge_project_plan_save", {
+    project_path: projectPath, branch, plan: cyclicPlan, confirm: true
+  }, async () => apiResponse({}));
+  assert.equal(cyclic.payload.result.isError, true);
+  assert.match(cyclic.payload.result.content[0].text, /contain a cycle/);
+  assert.equal(cyclic.requests, 0);
+
+  const credentialPlan = samplePlan();
+  credentialPlan.metadata = { api_key: "abcdefghijklmnop" };
+  const credential = await callTool("forge_project_plan_save", {
+    project_path: projectPath, branch, plan: credentialPlan, confirm: true
+  }, async () => apiResponse({}));
+  assert.equal(credential.payload.result.isError, true);
+  assert.match(credential.payload.result.content[0].text, /credential values/);
+  assert.equal(credential.requests, 0);
 });
