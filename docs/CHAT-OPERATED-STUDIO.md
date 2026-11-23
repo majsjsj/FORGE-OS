@@ -67,3 +67,8 @@ Keep workflows manual and short-lived. GitHub Actions, Codespaces, and Cloudflar
 ## Read-only release preflight
 
 The MCP tool `forge_project_preflight` runs a bounded structural check against committed files on the selected branch. It reuses the project inventory and reports a readiness state, blockers, warnings, and next actions for common Web, Flutter, Godot, and Unity layouts. It does not install packages, execute project code, start a browser, dispatch a workflow, or consume Actions quota. A structurally ready result is not evidence that the project runs; engine-specific tests and device verification remain separate approval-gated steps.
+
+
+## Saving generated Studio artifacts to cloud projects
+
+The MCP tool `forge_studio_artifact_save` commits Design Studio output, Game Lab level JSON, or a bounded set of generated project text files into an existing `forge/projects/*` branch. Every file path is constrained to remain below the selected `project_path`; writes to `main` are rejected. The operation requires explicit `confirm=true`, and existing files require their current SHA from `forge_workspace_read` to prevent stale overwrites. It delegates to the existing atomic batch writer and does not execute code, run tests, dispatch builds, or upload binary assets. After saving, use project inspection/preflight and the branch-aware preview tools as appropriate.
