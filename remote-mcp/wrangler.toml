@@ -2,3 +2,8 @@ name = "forge-os-remote-mcp"
 main = "src/index.js"
 compatibility_date = "2026-11-20"
 workers_dev = true
+
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true
