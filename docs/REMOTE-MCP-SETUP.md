@@ -9,6 +9,7 @@ This is the first remote-control layer for FORGE-OS. It is a stateless Streamabl
 - Project branch lifecycle: `forge_project_branch_create` creates isolated `forge/projects/<name>` branches from `main` or another project branch; `forge_project_branch_list` lists the first 100 project branches; `forge_project_branch_compare` shows changes against `main` and provides a GitHub review link.
 - Branch-aware read/list/inspect/write/batch-write/preview/build operations. Project writes are blocked on `main`; batch writes remain atomic (up to 40 files, 2 MB total) with optimistic SHA checks.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
+- Real one-shot shell commands on fresh GitHub-hosted runner VMs through `forge_terminal_run`, with a 180-second command limit, no repository secrets, read-only checkout permission, and logs/status retrieval. Runner filesystem changes are discarded.
 - Latest build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
 - Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
 - GitHub token and access token are runtime secrets, never repository files.
@@ -51,7 +52,8 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 
 - First call `forge_health`.
 - Create a unique project branch first, for example `forge/projects/my-game`, using `forge_project_branch_create` with `confirm=true`. Then pass that branch to `forge_project_inspect`, `forge_workspace_list`, `forge_workspace_read`, `forge_workspace_write`, `forge_workspace_batch_write`, `forge_preview_url`, and `forge_dispatch_build`.
-- Direct writes to `main` are blocked. Use `forge_project_branch_compare` to review changes and open the supplied GitHub compare link before merging through GitHub. No automatic merge is performed. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Batch limit: 40 files, 500 KB per file, 2 MB total.
+- Direct writes to `main` are blocked. `forge_terminal_run` executes a command in the selected project directory on a fresh temporary runner; it is not a persistent shell and does not save filesystem edits. The command is visible in GitHub logs; never pass credentials or secrets in it. Each command consumes Actions quota and requires explicit confirmation.
+- Use `forge_project_branch_compare` to review changes and open the supplied GitHub compare link before merging through GitHub. No automatic merge is performed. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Batch limit: 40 files, 500 KB per file, 2 MB total.
 - `forge_preview_url` serves the selected branch. Builds check out the selected branch. Changes remain isolated until an explicit review/merge process; this release does not yet provide an in-product merge or PR-approval tool.
 - The controller still does not sync uncommitted browser-editor drafts or upload binary project assets.
 - Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
@@ -64,4 +66,4 @@ Save and connect. Once connected on Claude web, enable the connector in a mobile
 
 ## Protocol notes
 
-The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, in-product PR review/merge, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
+The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, a persistent terminal/container, in-product PR review/merge, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
