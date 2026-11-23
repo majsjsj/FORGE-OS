@@ -55,3 +55,10 @@ Keep the model adapter provider-neutral. Vision QA must use an actual vision-cap
 ## Free-first constraints
 
 Keep workflows manual and short-lived. GitHub Actions, Codespaces, and Cloudflare quotas are account-dependent and can change. The system must surface quota/cost implications and fail closed rather than silently switching to paid infrastructure. No unlimited-free-build promise is made.
+
+## Visual design, game level editing, and QA tools
+
+- **Visual Design Studio** is a browser-side component editor for hero sections, text, buttons, and cards. It exports HTML/CSS or applies generated files directly to the local Monaco/fallback workspace and refreshes the sandboxed preview. It does not write to GitHub by itself; project-branch persistence still requires an explicitly authorized FORGE MCP write.
+- **Advanced Game Lab** is a 12×8 tile-map editor with terrain, walls, water, start/goal markers, enemies, and collectibles. It exports a versioned engine-neutral JSON level description. It is a level-data authoring tool, not a Godot/Unity runtime or full scene editor.
+- **Quality Assurance** parses the current HTML, compiles JavaScript for syntax validation without executing it, parses CSS using the browser CSS parser, and checks common accessibility and markup risks. It produces a downloadable JSON report. It is static local QA, not a full browser automation, device test, dependency audit, or security certification.
+- These tools run locally in the browser, add no external libraries, do not invoke cloud builds, and do not incur service charges.
