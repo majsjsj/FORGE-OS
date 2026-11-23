@@ -12,7 +12,7 @@ The MCP tool `forge_project_plan` turns an approved project brief into a depende
 6. Security reviewer — permissions, input validation, dependencies, privacy, and secret handling.
 7. Release specialist — versioning, app identity, metadata, signing prerequisites, and delivery checklist.
 
-The returned plan includes task IDs, dependencies, deliverables, acceptance criteria, execution policy, and limitations. It can be used by the connected conversational model as a checklist and handoff contract.
+The returned plan includes task IDs, dependencies, deliverables, acceptance criteria, execution policy, and limitations. It can be used by the connected conversational model as a checklist and handoff contract. Plans can also be persisted as `workspace/<project>/FORGE_PLAN.json` on the isolated branch, then read and updated as work progresses.
 
 ## Important execution boundary
 
@@ -33,8 +33,8 @@ The planner is deterministic and intentionally bounded:
 5. Perform specialist handoffs in dependency order. Keep product, design, architecture, engineering, QA, security, and release findings distinct so unresolved issues are visible.
 6. Before changing files, read the current contents and use the required SHA for guarded updates. Ask for confirmation before writes.
 7. Run read-only inspection and preflight first. Tests, terminal/cloud sessions, and builds that consume quota require separate explicit approval.
-8. Update `FORGE_CONTEXT.md` with confirmed decisions, architecture, constraints, and TODOs using `forge_project_context_save`. Never store passwords, tokens, private keys, signing credentials, or sensitive account data.
-9. Compare the project branch with main and present the changes for human review. Do not merge automatically.
+8. Save the reviewed plan with `forge_project_plan_save` after explicit confirmation. Use `forge_project_plan_read` to recover it and `forge_project_task_update` to record each task's pending, in-progress, blocked, or completed status. These writes require confirmation and a current SHA to prevent stale updates.\n9. Update `FORGE_CONTEXT.md` with confirmed decisions, architecture, constraints, and TODOs using `forge_project_context_save`. Never store passwords, tokens, private keys, signing credentials, or sensitive account data.
+10. Compare the project branch with main and present the changes for human review. Do not merge automatically.
 
 ## Approval and safety gates
 
@@ -46,4 +46,4 @@ The planner is deterministic and intentionally bounded:
 
 ## Scope of this implementation
 
-The specialist planner is a real MCP tool with input validation and automated tests. Specialist roles are handoff contracts for the conversational model; they are not separate model instances and do not run in the background. Scheduled automation, autonomous background agents, cross-user memory, and multi-tenant secret storage are not part of this feature.
+The specialist planner and persistent task tracker are real MCP tools with input validation and automated tests. Plans and task history are stored as ordinary project JSON on the isolated branch, with optimistic concurrency and credential-like value rejection. Specialist roles are handoff contracts for the conversational model; they are not separate model instances and do not run in the background. Scheduled automation, autonomous background agents, cross-user memory, and multi-tenant secret storage are not part of this feature.
