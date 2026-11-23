@@ -392,7 +392,7 @@ const TOOLS = [
   },
   {
     name: "forge_asset_import",
-    description: "Copy one asset previously stored in the optional Cloudflare R2 bucket into the matching path under workspace/ on its isolated project branch. This makes the binary file part of the Git project so the next authorized build can package it. Requires confirm=true. Existing project files are never overwritten; choose a new asset_path or handle the conflict explicitly. Maximum imported file size is 16 MiB. Requires the FORGE_ASSETS_BUCKET binding.",
+    description: "Copy one asset previously stored in the optional Cloudflare R2 bucket into the matching path under workspace/ on its isolated project branch. This makes the binary file part of the Git project so the next authorized build can package it. Requires confirm=true. Existing project files are never overwritten; choose a new asset_path or handle the conflict explicitly. Maximum imported file size is 16 MiB. Records the file's SHA-256 in forge-assets-manifest.json so the next engine job can verify it. Requires the FORGE_ASSETS_BUCKET binding.",
     inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" }, confirm: { type: "boolean" } }, required: ["branch","project_path","asset_path","confirm"], additionalProperties: false }
   },
   {
@@ -1059,42 +1059,9 @@ async function callTool(name, args, env) {
     if (name === "forge_asset_import") {
       if (args.confirm !== true) throw new Error("Asset import not performed: confirm=true is required after the user explicitly requests copying this R2 asset into the project branch.");
       if (!assetPath) throw new Error("asset_path is required.");
-      const destination = validateWorkspacePath(project + "/" + assetPath);
-      const object = await bucket.get(key);
-      if (!object) throw new Error("The selected asset does not exist in R2 for this branch and project.");
-      if (typeof object.size === "number" && object.size > 16 * 1024 * 1024)
-        throw new Error("One imported asset is limited to 16 MiB.");
-      const bytes = new Uint8Array(await object.arrayBuffer());
-      if (!bytes.length || bytes.length > 16 * 1024 * 1024) throw new Error("The selected R2 asset must be non-empty and no larger than 16 MiB.");
-      const parent = await branchHead(env, branch);
-      const currentCommit = await github(env, "git/commits/" + parent);
-      const currentTree = await github(env, "git/trees/" + currentCommit.tree.sha + "?recursive=1");
-      if (currentTree.truncated) throw new Error("Repository tree is too large to safely import this asset.");
-      if ((currentTree.tree || []).some(item => item.path === destination))
-        throw new Error("The destination already exists on this branch; no file was overwritten: " + destination);
-      let binary = "";
-      for (let offset = 0; offset < bytes.length; offset += 0x8000)
-        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-      const blob = await github(env, "git/blobs", {
-        method: "POST",
-        body: JSON.stringify({ content: btoa(binary), encoding: "base64" })
-      });
-      const nextTree = await github(env, "git/trees", {
-        method: "POST",
-        body: JSON.stringify({ base_tree: currentCommit.tree.sha, tree: [{ path: destination, mode: "100644", type: "blob", sha: blob.sha }] })
-      });
-      const nextCommit = await github(env, "git/commits", {
-        method: "POST",
-        body: JSON.stringify({ message: "FORGE: import asset " + destination, tree: nextTree.sha, parents: [parent] })
-      });
-      await github(env, "git/refs/heads/" + branch, {
-        method: "PATCH",
-        body: JSON.stringify({ sha: nextCommit.sha, force: false })
-      });
-      return { imported: true, branch, project_path: project, asset_path: assetPath, destination,
-        size_bytes: bytes.length, commit_sha: nextCommit.sha, commit_url: nextCommit.html_url,
-        content_type: object.httpMetadata?.contentType || "application/octet-stream",
-        note: "The asset is now committed to the isolated project branch and will be available to the next explicitly requested build." };
+      return await callTool("forge_asset_import_batch", {
+        branch, project_path: project, assets: [{ asset_path: assetPath }], confirm: true
+      }, env);
     }
     if (name.startsWith("forge_asset_multipart_")) {
       if (args.confirm !== true) throw new Error("Multipart operation not performed: confirm=true is required.");

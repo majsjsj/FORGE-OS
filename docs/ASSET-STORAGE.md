@@ -21,7 +21,7 @@ If the binding is absent, the asset tools return a clear configuration error and
 - `forge_asset_multipart_abort`: explicitly discard an incomplete upload.
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
 - `forge_asset_download_url`: create an HMAC-signed, read-only URL that expires after one hour.
-- `forge_asset_import`: explicitly copy one selected R2 asset into the matching `workspace/` path on the isolated project branch. Requires `confirm=true`, refuses to overwrite existing files, and supports up to 16 MiB per imported file. After import, the asset is part of the Git project and can be included in the next explicitly requested build.
+- `forge_asset_import`: explicitly copy one selected R2 asset into the matching `workspace/` path on the isolated project branch. Requires `confirm=true`, refuses to overwrite existing files, and supports up to 16 MiB per imported file. After import, the asset is part of the Git project and can be included in the next explicitly requested build. The tool also records its SHA-256 in `forge-assets-manifest.json` for pre-build verification.
 - `forge_asset_import_batch`: explicitly stage 1–20 selected R2 assets into one atomic Git commit on the isolated project branch. Each file is limited to 16 MiB and the total batch to 24 MiB. It validates every destination before creating the commit, rejects duplicate paths and existing project files, and never overwrites. It also creates or updates `forge-assets-manifest.json` with each imported file's relative path, byte size, content type, and SHA-256 digest. Requires `confirm=true`.
 - `forge_asset_delete`: explicitly delete one object; requires `confirm=true`.
 
