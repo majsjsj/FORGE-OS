@@ -1,7 +1,7 @@
 (() => {
 const paths={html:'../workspace/blank-project/index.html',css:'../workspace/blank-project/styles.css',js:'../workspace/blank-project/script.js'};
 const names={html:'index.html',css:'styles.css',js:'script.js'},langs={html:'html',css:'css',js:'javascript'};
-const models={},originals={};let active='html',editor=null,monacoReady=false,remoteProjectDir=null,remoteVersion=null,remotePoll=null;
+const models={},originals={};window.forgeModels=models;let active='html',editor=null,monacoReady=false,remoteProjectDir=null,remoteVersion=null,remotePoll=null;
 const $=id=>document.getElementById(id),fallback=$('fallback'),frame=$('preview'),logs=$('logs');
 function log(message,error=false){const p=document.createElement('p');p.textContent=(error?'✕ ':'✓ ')+message;if(error)p.className='error';logs.appendChild(p);logs.scrollTop=logs.scrollHeight}
 function setSave(s){$('saveState').textContent='● '+s}

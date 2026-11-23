@@ -34,3 +34,17 @@ This is an evolving development environment, not a complete hosted VS Code insta
 ## Publish on GitHub Pages
 
 The workflow publishes the landing page, editor, and blank starter workspace on GitHub Pages. Enable **Settings → Pages → Build and deployment → Source: GitHub Actions** in the repository. The deployment is considered live only after the Pages workflow succeeds.
+
+
+## Lightweight studio tools
+
+The Studio adds optional, dependency-free panels for App Lab, Game Studio planning, a small engine-neutral 2D scene sketcher, local asset metadata, GitHub history, a safe allowlisted browser console, read-only cloud workspace browsing, Actions build status, artifact links, and basic source-pattern checks.
+
+These panels are deliberately lightweight:
+- No engine binaries, SDKs, emulator images, sample art packs, or build artifacts are stored in the repository.
+- Asset Library stores filenames and metadata in browser localStorage only; it does not upload assets.
+- Scene Designer exports an engine-neutral JSON sketch. It is not a native Godot/Unity scene exporter.
+- Git history, cloud workspace listing, build runs, and artifact metadata use public read-only GitHub API requests. Changes and commits still use GitHub.dev or the authenticated FORGE MCP tools.
+- Safe Terminal accepts only its documented read-only commands; it does not expose arbitrary shell execution.
+- App Lab performs browser-side source-size and markup checks, not real Android device emulation or runtime profiling.
+- Security Scanner is a lightweight pattern check, not a complete SAST/dependency vulnerability scanner.
