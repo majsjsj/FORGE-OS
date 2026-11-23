@@ -19,22 +19,137 @@ on:
         options: [test, apk, aab, web, linux]
         default: test
       project_branch:
-        description: Isolated project branch (defaults to the dispatch ref)
+        description: Isolated project branch to build (workflow itself must be dispatched from main)
+        required: false
+        type: string
+      sync_assets:
+        description: Explicitly download selected R2 assets for this run (off by default)
+        required: false
+        type: boolean
+        default: false
+      asset_paths:
+        description: Newline-separated exact R2 asset paths; required when sync_assets is true (max 20 files / 24 MiB)
         required: false
         type: string
 
 permissions:
   contents: read
   pages: write
-  id-token: write
 
 concurrency:
   group: forge-job-${{ github.workflow }}-${{ github.ref }}-${{ inputs.engine }}
   cancel-in-progress: true
 
 jobs:
+  sync_assets:
+    if: inputs.sync_assets == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Authenticate and stage only explicitly selected R2 assets
+        env:
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          PROJECT_PATH: ${{ inputs.project_path }}
+          ASSET_PATHS: ${{ inputs.asset_paths }}
+          OIDC_AUDIENCE: https://forge-os-remote-mcp.majsjsj.workers.dev
+          FORGE_ASSET_SYNC_URL: https://forge-os-remote-mcp.majsjsj.workers.dev/actions/assets
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, shutil, urllib.parse, urllib.request
+          from pathlib import Path
+
+          if os.environ.get("GITHUB_REF") != "refs/heads/main":
+              raise SystemExit("R2 sync must be dispatched from the trusted main workflow ref.")
+          branch = os.environ.get("PROJECT_BRANCH", "")
+          project = os.environ.get("PROJECT_PATH", "")
+          if not branch.startswith("forge/projects/") or ".." in branch or "//" in branch:
+              raise SystemExit("R2 sync requires an isolated forge/projects/ project_branch.")
+          if not project.startswith("workspace/") or ".." in Path(project).parts:
+              raise SystemExit("Invalid workspace project_path.")
+          paths = [line.strip() for line in os.environ.get("ASSET_PATHS", "").splitlines() if line.strip()]
+          if not 1 <= len(paths) <= 20 or len(set(paths)) != len(paths):
+              raise SystemExit("Provide 1–20 unique newline-separated asset paths.")
+          for value in paths:
+              p = Path(value)
+              if p.is_absolute() or "\\" in value or value == "forge-assets-manifest.json" or any(
+                  part in ("", ".", "..") or part.startswith(".") for part in p.parts
+              ):
+                  raise SystemExit("Unsafe or reserved asset path: " + value)
+              if any("secret" in part.lower() or "credential" in part.lower() for part in p.parts):
+                  raise SystemExit("Credential-like asset path is blocked.")
+              if p.suffix.lower() in {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".mobileprovision"}:
+                  raise SystemExit("Private-key or signing asset paths are blocked.")
+          request_url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          parts = urllib.parse.urlsplit(request_url)
+          query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+          query.append(("audience", os.environ["OIDC_AUDIENCE"]))
+          token_url = urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(query), parts.fragment))
+          token_req = urllib.request.Request(token_url, headers={
+              "Authorization": "Bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"],
+              "Accept": "application/json"
+          })
+          with urllib.request.urlopen(token_req, timeout=15) as response:
+              oidc_token = json.loads(response.read())["value"]
+          payload = json.dumps({"project_branch": branch, "project_path": project, "asset_paths": paths}).encode()
+          sync_req = urllib.request.Request(os.environ["FORGE_ASSET_SYNC_URL"], data=payload, method="POST", headers={
+              "Authorization": "Bearer " + oidc_token, "Content-Type": "application/json", "Accept": "application/json"
+          })
+          with urllib.request.urlopen(sync_req, timeout=45) as response:
+              result = json.loads(response.read())
+          if result.get("ok") is not True or result.get("branch") != branch or result.get("project_path") != project:
+              raise SystemExit("Worker returned an invalid asset sync response.")
+          assets = result.get("assets")
+          if not isinstance(assets, list) or len(assets) != len(paths):
+              raise SystemExit("Worker did not return exactly the selected assets.")
+          stage = Path(os.environ["RUNNER_TEMP"]) / "forge-r2-assets"
+          if stage.exists():
+              shutil.rmtree(stage)
+          stage.mkdir(parents=True)
+          manifest_entries = []
+          total = 0
+          for asset in assets:
+              rel = asset.get("path")
+              if rel not in paths or not isinstance(asset.get("download_url"), str):
+                  raise SystemExit("Worker returned an unselected or malformed asset.")
+              target = stage / rel
+              if not target.resolve().is_relative_to(stage.resolve()):
+                  raise SystemExit("Worker returned an unsafe asset path.")
+              target.parent.mkdir(parents=True, exist_ok=True)
+              url = urllib.parse.urlsplit(asset["download_url"])
+              if url.scheme != "https" or url.netloc != "forge-os-remote-mcp.majsjsj.workers.dev" or not url.path.startswith("/assets/"):
+                  raise SystemExit("Worker returned a download URL outside the trusted asset endpoint.")
+              with urllib.request.urlopen(asset["download_url"], timeout=45) as response:
+                  data = response.read(16 * 1024 * 1024 + 1)
+              if not data or len(data) > 16 * 1024 * 1024 or len(data) != asset.get("size_bytes"):
+                  raise SystemExit("Downloaded asset size mismatch: " + rel)
+              digest = hashlib.sha256(data).hexdigest()
+              if digest != asset.get("sha256"):
+                  raise SystemExit("Downloaded asset SHA-256 mismatch: " + rel)
+              target.write_bytes(data)
+              total += len(data)
+              if total > 24 * 1024 * 1024:
+                  raise SystemExit("R2 sync batch exceeds 24 MiB.")
+              manifest_entries.append({"path": rel, "size_bytes": len(data), "sha256": digest,
+                  "content_type": asset.get("content_type", "application/octet-stream")})
+          manifest = {"format": "forge-assets-manifest-v1", "branch": branch, "project_path": project, "files": manifest_entries}
+          (stage / "forge-assets-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print("Verified and staged %d selected R2 assets (%d bytes)." % (len(paths), total))
+          PY
+      - name: Upload short-lived staged asset bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-r2-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/forge-r2-assets/
+          if-no-files-found: error
+          retention-days: 1
+
   web:
-    if: inputs.engine == 'web'
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'web' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -42,8 +157,72 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Download selected R2 assets
+        if: inputs.sync_assets == true
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-r2-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/forge-r2-assets
+      - name: Add staged assets without overwriting project files
+        if: inputs.sync_assets == true
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          STAGED_ASSETS: ${{ runner.temp }}/forge-r2-assets
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path, PurePosixPath
+          root = Path.cwd().resolve()
+          project = Path(os.environ["PROJECT_PATH"])
+          project_root = (root / project).resolve()
+          stage = Path(os.environ["STAGED_ASSETS"]).resolve()
+          if project.is_absolute() or ".." in project.parts or not project_root.is_relative_to(root) or not project_root.is_dir():
+              raise SystemExit("Unsafe or missing target project directory.")
+          manifest_file = stage / "forge-assets-manifest.json"
+          if manifest_file.is_symlink() or not manifest_file.is_file():
+              raise SystemExit("Staged R2 asset manifest is missing or unsafe.")
+          incoming = json.loads(manifest_file.read_text(encoding="utf-8"))
+          if incoming.get("format") != "forge-assets-manifest-v1" or incoming.get("branch") != os.environ["PROJECT_BRANCH"] or incoming.get("project_path") != project.as_posix():
+              raise SystemExit("Staged R2 asset manifest does not match the selected project.")
+          entries = incoming.get("files")
+          if not isinstance(entries, list) or not entries:
+              raise SystemExit("No selected R2 assets were staged.")
+          target_manifest = project_root / "forge-assets-manifest.json"
+          existing = {"format": "forge-assets-manifest-v1", "branch": os.environ["PROJECT_BRANCH"], "project_path": project.as_posix(), "files": []}
+          if target_manifest.exists():
+              if target_manifest.is_symlink() or not target_manifest.is_file():
+                  raise SystemExit("Existing project asset manifest is unsafe.")
+              existing = json.loads(target_manifest.read_text(encoding="utf-8"))
+              if existing.get("format") != "forge-assets-manifest-v1" or existing.get("branch") != os.environ["PROJECT_BRANCH"] or existing.get("project_path") != project.as_posix() or not isinstance(existing.get("files"), list):
+                  raise SystemExit("Existing project asset manifest is invalid or belongs to another project.")
+          known = {item.get("path") for item in existing["files"] if isinstance(item, dict)}
+          for item in entries:
+              rel = item.get("path")
+              posix = PurePosixPath(rel) if isinstance(rel, str) else None
+              if not posix or posix.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in posix.parts):
+                  raise SystemExit("Unsafe path in staged manifest.")
+              if rel in known:
+                  raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
+                  raise SystemExit("Staged asset is missing or unsafe: " + rel)
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
+                  raise SystemExit("Refusing to overwrite an existing project path: " + rel)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+              known.add(rel)
+          existing["files"].extend(entries)
+          if len(existing["files"]) > 5000:
+              raise SystemExit("The FORGE asset manifest is limited to 5,000 entries.")
+          target_manifest.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+          print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
+          PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -151,15 +330,79 @@ jobs:
           retention-days: 3
 
   flutter:
-    if: inputs.engine == 'flutter'
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'flutter' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Download selected R2 assets
+        if: inputs.sync_assets == true
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-r2-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/forge-r2-assets
+      - name: Add staged assets without overwriting project files
+        if: inputs.sync_assets == true
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          STAGED_ASSETS: ${{ runner.temp }}/forge-r2-assets
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path, PurePosixPath
+          root = Path.cwd().resolve()
+          project = Path(os.environ["PROJECT_PATH"])
+          project_root = (root / project).resolve()
+          stage = Path(os.environ["STAGED_ASSETS"]).resolve()
+          if project.is_absolute() or ".." in project.parts or not project_root.is_relative_to(root) or not project_root.is_dir():
+              raise SystemExit("Unsafe or missing target project directory.")
+          manifest_file = stage / "forge-assets-manifest.json"
+          if manifest_file.is_symlink() or not manifest_file.is_file():
+              raise SystemExit("Staged R2 asset manifest is missing or unsafe.")
+          incoming = json.loads(manifest_file.read_text(encoding="utf-8"))
+          if incoming.get("format") != "forge-assets-manifest-v1" or incoming.get("branch") != os.environ["PROJECT_BRANCH"] or incoming.get("project_path") != project.as_posix():
+              raise SystemExit("Staged R2 asset manifest does not match the selected project.")
+          entries = incoming.get("files")
+          if not isinstance(entries, list) or not entries:
+              raise SystemExit("No selected R2 assets were staged.")
+          target_manifest = project_root / "forge-assets-manifest.json"
+          existing = {"format": "forge-assets-manifest-v1", "branch": os.environ["PROJECT_BRANCH"], "project_path": project.as_posix(), "files": []}
+          if target_manifest.exists():
+              if target_manifest.is_symlink() or not target_manifest.is_file():
+                  raise SystemExit("Existing project asset manifest is unsafe.")
+              existing = json.loads(target_manifest.read_text(encoding="utf-8"))
+              if existing.get("format") != "forge-assets-manifest-v1" or existing.get("branch") != os.environ["PROJECT_BRANCH"] or existing.get("project_path") != project.as_posix() or not isinstance(existing.get("files"), list):
+                  raise SystemExit("Existing project asset manifest is invalid or belongs to another project.")
+          known = {item.get("path") for item in existing["files"] if isinstance(item, dict)}
+          for item in entries:
+              rel = item.get("path")
+              posix = PurePosixPath(rel) if isinstance(rel, str) else None
+              if not posix or posix.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in posix.parts):
+                  raise SystemExit("Unsafe path in staged manifest.")
+              if rel in known:
+                  raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
+                  raise SystemExit("Staged asset is missing or unsafe: " + rel)
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
+                  raise SystemExit("Refusing to overwrite an existing project path: " + rel)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+              known.add(rel)
+          existing["files"].extend(entries)
+          target_manifest.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+          print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
+          PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -295,15 +538,79 @@ jobs:
           retention-days: 3
 
   godot:
-    if: inputs.engine == 'godot'
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'godot' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Download selected R2 assets
+        if: inputs.sync_assets == true
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-r2-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/forge-r2-assets
+      - name: Add staged assets without overwriting project files
+        if: inputs.sync_assets == true
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          STAGED_ASSETS: ${{ runner.temp }}/forge-r2-assets
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path, PurePosixPath
+          root = Path.cwd().resolve()
+          project = Path(os.environ["PROJECT_PATH"])
+          project_root = (root / project).resolve()
+          stage = Path(os.environ["STAGED_ASSETS"]).resolve()
+          if project.is_absolute() or ".." in project.parts or not project_root.is_relative_to(root) or not project_root.is_dir():
+              raise SystemExit("Unsafe or missing target project directory.")
+          manifest_file = stage / "forge-assets-manifest.json"
+          if manifest_file.is_symlink() or not manifest_file.is_file():
+              raise SystemExit("Staged R2 asset manifest is missing or unsafe.")
+          incoming = json.loads(manifest_file.read_text(encoding="utf-8"))
+          if incoming.get("format") != "forge-assets-manifest-v1" or incoming.get("branch") != os.environ["PROJECT_BRANCH"] or incoming.get("project_path") != project.as_posix():
+              raise SystemExit("Staged R2 asset manifest does not match the selected project.")
+          entries = incoming.get("files")
+          if not isinstance(entries, list) or not entries:
+              raise SystemExit("No selected R2 assets were staged.")
+          target_manifest = project_root / "forge-assets-manifest.json"
+          existing = {"format": "forge-assets-manifest-v1", "branch": os.environ["PROJECT_BRANCH"], "project_path": project.as_posix(), "files": []}
+          if target_manifest.exists():
+              if target_manifest.is_symlink() or not target_manifest.is_file():
+                  raise SystemExit("Existing project asset manifest is unsafe.")
+              existing = json.loads(target_manifest.read_text(encoding="utf-8"))
+              if existing.get("format") != "forge-assets-manifest-v1" or existing.get("branch") != os.environ["PROJECT_BRANCH"] or existing.get("project_path") != project.as_posix() or not isinstance(existing.get("files"), list):
+                  raise SystemExit("Existing project asset manifest is invalid or belongs to another project.")
+          known = {item.get("path") for item in existing["files"] if isinstance(item, dict)}
+          for item in entries:
+              rel = item.get("path")
+              posix = PurePosixPath(rel) if isinstance(rel, str) else None
+              if not posix or posix.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in posix.parts):
+                  raise SystemExit("Unsafe path in staged manifest.")
+              if rel in known:
+                  raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
+                  raise SystemExit("Staged asset is missing or unsafe: " + rel)
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
+                  raise SystemExit("Refusing to overwrite an existing project path: " + rel)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+              known.add(rel)
+          existing["files"].extend(entries)
+          target_manifest.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+          print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
+          PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -496,15 +803,79 @@ jobs:
           retention-days: 3
 
   unity:
-    if: inputs.engine == 'unity'
+    needs: [sync_assets]
+    if: always() && inputs.engine == 'unity' && (needs.sync_assets.result == 'success' || needs.sync_assets.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Download selected R2 assets
+        if: inputs.sync_assets == true
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-r2-assets-${{ github.run_id }}
+          path: ${{ runner.temp }}/forge-r2-assets
+      - name: Add staged assets without overwriting project files
+        if: inputs.sync_assets == true
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          STAGED_ASSETS: ${{ runner.temp }}/forge-r2-assets
+        run: |
+          python - <<'PY'
+          import json, os, shutil
+          from pathlib import Path, PurePosixPath
+          root = Path.cwd().resolve()
+          project = Path(os.environ["PROJECT_PATH"])
+          project_root = (root / project).resolve()
+          stage = Path(os.environ["STAGED_ASSETS"]).resolve()
+          if project.is_absolute() or ".." in project.parts or not project_root.is_relative_to(root) or not project_root.is_dir():
+              raise SystemExit("Unsafe or missing target project directory.")
+          manifest_file = stage / "forge-assets-manifest.json"
+          if manifest_file.is_symlink() or not manifest_file.is_file():
+              raise SystemExit("Staged R2 asset manifest is missing or unsafe.")
+          incoming = json.loads(manifest_file.read_text(encoding="utf-8"))
+          if incoming.get("format") != "forge-assets-manifest-v1" or incoming.get("branch") != os.environ["PROJECT_BRANCH"] or incoming.get("project_path") != project.as_posix():
+              raise SystemExit("Staged R2 asset manifest does not match the selected project.")
+          entries = incoming.get("files")
+          if not isinstance(entries, list) or not entries:
+              raise SystemExit("No selected R2 assets were staged.")
+          target_manifest = project_root / "forge-assets-manifest.json"
+          existing = {"format": "forge-assets-manifest-v1", "branch": os.environ["PROJECT_BRANCH"], "project_path": project.as_posix(), "files": []}
+          if target_manifest.exists():
+              if target_manifest.is_symlink() or not target_manifest.is_file():
+                  raise SystemExit("Existing project asset manifest is unsafe.")
+              existing = json.loads(target_manifest.read_text(encoding="utf-8"))
+              if existing.get("format") != "forge-assets-manifest-v1" or existing.get("branch") != os.environ["PROJECT_BRANCH"] or existing.get("project_path") != project.as_posix() or not isinstance(existing.get("files"), list):
+                  raise SystemExit("Existing project asset manifest is invalid or belongs to another project.")
+          known = {item.get("path") for item in existing["files"] if isinstance(item, dict)}
+          for item in entries:
+              rel = item.get("path")
+              posix = PurePosixPath(rel) if isinstance(rel, str) else None
+              if not posix or posix.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in posix.parts):
+                  raise SystemExit("Unsafe path in staged manifest.")
+              if rel in known:
+                  raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
+                  raise SystemExit("Staged asset is missing or unsafe: " + rel)
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
+                  raise SystemExit("Refusing to overwrite an existing project path: " + rel)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copyfile(source, target)
+              known.add(rel)
+          existing["files"].extend(entries)
+          target_manifest.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+          print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
+          PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -658,6 +1029,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download browser game build
         uses: actions/download-artifact@v4
