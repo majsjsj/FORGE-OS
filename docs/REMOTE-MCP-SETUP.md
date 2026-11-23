@@ -1,73 +1,57 @@
 # FORGE Remote MCP Controller
 
-This is the first remote-control layer for FORGE-OS. It is a stateless Streamable HTTP MCP endpoint intended for Claude custom connectors. It starts only explicitly requested GitHub Actions jobs; it does not keep a build server running.
+The deployed Cloudflare Worker is a stateless Streamable HTTP MCP endpoint for Claude custom connectors. It starts GitHub Actions jobs only when explicitly requested; it does not keep a build server running.
 
 ## Current scope
 
 - Authenticated MCP endpoint at `/mcp` using a dedicated bearer token.
-- Health check.
-- Project branch lifecycle: `forge_project_branch_create` creates isolated `forge/projects/<name>` branches from `main` or another project branch; `forge_project_branch_list` lists the first 100 project branches; `forge_project_branch_compare` shows changes against `main` and provides a GitHub review link.
-- Branch-aware read/list/inspect/write/batch-write/preview/build operations. Project writes are blocked on `main`; batch writes remain atomic (up to 100 files, 2 MB per text file, 10 MB total) with optimistic SHA checks.
+- Health check and isolated project branch lifecycle: create/list/compare branches under `forge/projects/<name>`.
+- Branch-aware workspace list/read/inspect/write/batch-write/preview/build operations. Direct writes to `main` are blocked.
 - Manual dispatch of the repository's `forge-on-demand.yml` workflow.
-- Short one-shot commands through `forge_terminal_run` (180 seconds), plus `forge_cloud_run` sessions for dependency installation and longer project tasks (10 minutes). Cloud sessions run without repository secrets; optional saving uses a separate fresh job that treats the uploaded project delta as data and commits it through the GitHub API, never executing project code in the token-bearing save job.
-- Latest build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
-- Strict engine/output allowlists, path restrictions, blocked credential-file names, and explicit confirmation flags.
-- GitHub token and access token are runtime secrets, never repository files.
+- Short one-shot commands through `forge_terminal_run` (up to 180 seconds) and temporary cloud sessions through `forge_cloud_run` (up to 10 minutes). Cloud sessions run without repository secrets; optional saving uses a separate job that saves only changed files to the same isolated branch.
+- Build status, job/step summaries, artifact metadata, bounded job-log retrieval, and temporary signed artifact download URLs.
+- Optional Cloudflare R2 asset tools: single uploads up to 32 MiB and resumable multipart uploads. R2 is unavailable until the owner configures the optional `FORGE_ASSETS_BUCKET` binding.
 
-This is a **single-owner controller**, not yet a multi-user service. Do not share its bearer token or connect untrusted users. It can create and update text files through MCP and save project files (including binary files) from a cloud session. A cloud save is limited to 200 files and 50 MB per session. It does not yet sync uncommitted browser drafts, download build artifact bytes directly, sign apps, or provide a per-user secret vault.
+The controller is single-owner, not a multi-user service. Do not share its bearer token or connect untrusted users. It does not provide tenant isolation or a per-user secret vault.
 
-## Deploy on the Cloudflare Workers free plan
+## Repository and resource limits
 
-Cloudflare account and free-plan limits apply; check current limits before use. No paid service is enabled by this repository. Deployment is manual-only and uses one short GitHub Actions run; it does not run on every commit.
+- Single text-file write: up to 4 MB.
+- Atomic batch write: up to 150 files, 4 MB per file, and 20 MB total.
+- Cloud-session save: up to 250 changed paths and 75 MB total.
+- R2 single-request upload: up to 32 MiB per object. Larger objects use sequential multipart uploads (up to 10 MiB per part; non-final parts must be at least 5 MiB).
+- Asset download URLs expire after one hour. Treat them as bearer links and do not post them publicly.
+- GitHub Actions artifacts are retained for three days by the current build workflow.
 
-1. Create a Cloudflare account and open **Manage Account → API Tokens → Create Token**.
-2. Choose the **Edit Cloudflare Workers** template and restrict it to the one account that will host FORGE. Cloudflare may require account-level permission to create the first Worker; follow the current Cloudflare token wizard. See the [official GitHub Actions deployment guide](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/).
-3. Copy the Cloudflare account ID from the Workers dashboard.
-4. Create a GitHub fine-grained personal access token scoped only to `majsjsj/FORGE-OS` with:
-   - Actions: Read and write
-   - Contents: Read and write
-   Do not grant administration, secrets, or unrelated repository access.
-5. Generate a separate random `FORGE_ACCESS_TOKEN` with at least 32 characters. Keep it private.
-6. In GitHub, open **Settings → Secrets and variables → Actions → New repository secret**. Add these four secrets exactly:
-   - `CLOUDFLARE_API_TOKEN` — the Cloudflare Workers deployment token
-   - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
-   - `FORGE_GITHUB_TOKEN` — the fine-grained GitHub token from step 4
-   - `FORGE_ACCESS_TOKEN` — the random access token from step 5
-7. Open [Deploy FORGE Remote MCP](https://github.com/majsjsj/FORGE-OS/actions/workflows/deploy-remote-mcp.yml), select **Run workflow**, and run it on `main`.
-8. Wait for the run to finish successfully. Its log will show the deployed `workers.dev` hostname. The MCP URL is that hostname plus `/mcp`; for example `https://forge-os-remote-mcp.<your-workers-subdomain>.workers.dev/mcp`.
-9. The workflow uploads `FORGE_GITHUB_TOKEN` and `FORGE_ACCESS_TOKEN` to Cloudflare as encrypted Worker secrets. It does not print their values.
+Limits are enforced by the service; they are not promises of unlimited storage or execution. Keep binary assets out of Git history when optional external storage is configured.
 
-If the first deployment fails because the API token cannot create a new Worker, use the minimum Cloudflare permission required by its current dashboard/API for initial creation, then narrow the token to Editor access for the existing Worker where supported. Never put credentials in repository files or chat messages.
+## Deploy and connect
 
-## Optional external asset storage
+The Worker is deployed separately from the static Studio. Deployment credentials remain Cloudflare/GitHub secrets and must never be placed in repository files or chat. To rotate or redeploy it, use the repository's manual **Deploy FORGE Remote MCP** workflow and the existing Cloudflare Worker configuration.
 
-See [Asset Storage](ASSET-STORAGE.md) to configure an optional Cloudflare R2 bucket binding named `FORGE_ASSETS_BUCKET`. This is not enabled by default and may incur charges beyond Cloudflare's current free allowance. The asset tools are unavailable until the binding is configured. Uploads are stored outside GitHub; build workflows do not yet auto-sync them into projects.
-
-## Connect Claude
-
-On Claude web, open **Customize → Connectors → Add → Custom → Web** (wording may vary). Enter the Worker URL ending in `/mcp`. Choose fixed request-header authentication and configure:
+On Claude web, add a custom connector using the deployed Worker URL ending in `/mcp`. Configure fixed request-header authentication:
 
 - Header: `Authorization`
 - Value: `Bearer <FORGE_ACCESS_TOKEN>`
 
-Save and connect. Once connected on Claude web, enable the connector in a mobile conversation from the **+ → Connectors** menu. Claude mobile may not offer direct creation of a custom connector; create it on the web first.
+Save and connect. Once connected on Claude web, enable the connector in a mobile conversation from the **+ → Connectors** menu (wording may vary).
 
-## Use safely
+## Safe operating contract
 
-- First call `forge_health`.
-- Create a unique project branch first, for example `forge/projects/my-game`, using `forge_project_branch_create` with `confirm=true`. Then pass that branch to `forge_project_inspect`, `forge_workspace_list`, `forge_workspace_read`, `forge_workspace_write`, `forge_workspace_batch_write`, `forge_preview_url`, and `forge_dispatch_build`.
-- Direct writes to `main` are blocked. `forge_terminal_run` is a short disposable command runner. `forge_cloud_run` provides up to 10 minutes for dependency installation, tests, and project tasks. Both run on temporary runners with no repository secrets; command text appears in logs, so never pass credentials or secrets. Cloud changes are discarded by default. Set `save_changes=true` only when the user explicitly wants the result committed to the same isolated project branch; the separate save job allows up to 200 files / 50 MB and does not execute project code while holding the write token. Every cloud session consumes Actions quota and requires explicit confirmation.
-- Use `forge_project_branch_compare` to review changes and open the supplied GitHub compare link before merging through GitHub. No automatic merge is performed. Existing files in a batch require the current blob SHA from `forge_workspace_read`; stale versions are rejected. Atomic batch limit: 100 files, 2 MB per text file, 10 MB total. Larger work can be saved through a cloud session (200 files / 50 MB) or split into separate batches.
-- `forge_preview_url` serves the selected branch. Builds check out the selected branch. Changes remain isolated until an explicit review/merge process; this release does not yet provide an in-product merge or PR-approval tool.
-- The controller still does not sync uncommitted browser-editor drafts automatically. Binary files can be saved from a cloud session within its per-session limit.
-- Ask for a build/test explicitly. Only then call `forge_dispatch_build` with `confirm=true`.
-- Poll `forge_latest_build` or inspect `forge_build_details`; retrieve logs with `forge_build_logs` if needed.
-- Use `forge_artifact_download` with an artifact ID from build details to obtain a temporary ZIP download link. Download links expire; artifacts are retained for only three days.
-- A dispatch response means GitHub accepted the request, **not** that the build passed.
-- Unity currently supports only Linux output and still requires the repository's `UNITY_LICENSE` secret. Godot cloud Android export is not enabled. Flutter APK/AAB output is unsigned.
-- GitHub Actions quotas apply. The controller never switches to paid runners.
-- Revoke the GitHub token and rotate `FORGE_ACCESS_TOKEN` immediately if exposed.
+1. Call `forge_health` first.
+2. Create or select an isolated project branch before editing project files.
+3. Inspect the branch and use current file SHAs for updates. Batch writes are atomic and reject stale versions.
+4. Treat terminal/cloud execution as code execution. Never pass credentials in commands; command text may appear in logs.
+5. Cloud-session changes are discarded by default. Save only when explicitly requested.
+6. Ask before dispatching any build/test. Use `confirm=true` only after the user explicitly authorizes that specific run.
+7. A dispatch response means GitHub accepted the request, not that the build passed. Inspect run status and logs.
+8. Return only verified artifact links. Temporary download URLs expire; artifacts are short-lived.
+9. Never switch to paid runners, persistent VMs, or paid storage without explicit approval.
 
-## Protocol notes
+## Optional external asset storage
 
-The Worker implements the stateless JSON response mode of MCP Streamable HTTP for initialize, notifications, ping, tools/list, and tools/call. It intentionally does not implement OAuth, multiple tenants, durable sessions, resource APIs, a persistent terminal/container, resumable sessions, in-product PR review/merge, or artifact binary transfer yet. Keep the Worker updated and review its code before connecting it to an account with write permissions.
+See [Asset Storage](ASSET-STORAGE.md) to configure the optional R2 binding. The bucket is not created automatically and may incur charges beyond Cloudflare's current free allowance. Uploaded R2 assets are not yet automatically synchronized into project build folders; upload alone does not make an asset part of an APK/AAB/Web build.
+
+## Capability boundaries
+
+The Worker is not a persistent terminal, full remote IDE, Android emulator, or multi-tenant workspace. GitHub-hosted jobs are temporary runners. The service does not automatically merge project branches, publish to app stores, or sign releases without the required project configuration and secrets.
