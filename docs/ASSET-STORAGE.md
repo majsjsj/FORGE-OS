@@ -22,12 +22,23 @@ If the binding is absent, the asset tools return a clear configuration error and
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
 - `forge_asset_download_url`: create an HMAC-signed, read-only URL that expires after one hour.
 - `forge_asset_import`: explicitly copy one selected R2 asset into the matching `workspace/` path on the isolated project branch. Requires `confirm=true`, refuses to overwrite existing files, and supports up to 16 MiB per imported file. After import, the asset is part of the Git project and can be included in the next explicitly requested build.
+- `forge_asset_import_batch`: explicitly stage 1–20 selected R2 assets into one atomic Git commit on the isolated project branch. Each file is limited to 16 MiB and the total batch to 24 MiB. It validates every destination before creating the commit, rejects duplicate paths and existing project files, and never overwrites. Requires `confirm=true`.
 - `forge_asset_delete`: explicitly delete one object; requires `confirm=true`.
 
 Objects are namespaced by isolated project branch and project path. They are not committed to GitHub, included in repository clones, or stored as GitHub Actions artifacts. The signed download endpoint streams the object from R2 and does not expose the bucket publicly. URLs are bearer links: anyone who receives one can download that asset until it expires, so do not post them publicly.
 
 ## Important current boundary
 
-External storage remains an optional independent asset store; builds do not automatically synchronize every R2 object. To include an uploaded asset in a build, explicitly call `forge_asset_import` for that file. The tool commits the binary into the selected isolated project branch under `workspace/`; the next explicitly requested build can then package it. A successful upload alone does not make the asset available inside an APK/AAB/Web build.
+External storage remains an optional independent asset store; builds do not automatically synchronize R2 objects, and GitHub Actions runners do not have direct access to the Worker’s R2 binding. To include uploaded assets in a build, first review `forge_asset_list`, then explicitly call `forge_asset_import` for one file or `forge_asset_import_batch` for a selected group. The import tool commits the binaries into the selected isolated project branch under `workspace/`; the next separately authorized build can then package them. A successful upload alone does not make an asset available inside an APK/AAB/Web build. Batch staging is a deliberate pre-build step, not an automatic background sync.
 
 The single-request upload API accepts up to 32 MiB per file per call. Larger files can use R2 multipart uploads: start once, upload sequential parts, then complete with the returned etags. Keep the `upload_id` and etags until completion; if an upload is no longer needed, call the abort tool. Incomplete multipart uploads may remain billable until aborted or removed by an owner-configured R2 lifecycle rule. The implementation does not yet provide automatic deduplication, automatic lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
+
+
+## Recommended pre-build asset staging
+
+1. Confirm that the optional `FORGE_ASSETS_BUCKET` binding is configured; if it is absent, keep assets in the local browser library or project repository instead.
+2. Call `forge_asset_list` for the exact project branch and directory, and inspect the returned paths and sizes. Follow the returned cursor if the listing is truncated.
+3. Select only the files needed by the project. Use `forge_asset_import_batch` for up to 20 files / 24 MiB total, or the single-file import for a file up to 16 MiB. Confirm the destination paths and that no existing project file will be overwritten.
+4. Verify the new commit and inspect the project files. Only then, if the user separately requests it, dispatch the required engine build.
+
+The batch operation validates all selected objects and destinations before committing. It creates one Git tree and one commit for the whole batch; if validation or object retrieval fails, the project branch is not advanced. Unreferenced Git blobs may exist if GitHub accepts some blob uploads but a later API operation fails; they are not reachable from the project branch. The operation does not create an R2 bucket, change billing, start a build, or delete the source R2 objects.

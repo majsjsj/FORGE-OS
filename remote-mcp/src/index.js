@@ -396,6 +396,20 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" }, confirm: { type: "boolean" } }, required: ["branch","project_path","asset_path","confirm"], additionalProperties: false }
   },
   {
+    name: "forge_asset_import_batch",
+    description: "Stage up to 20 explicitly selected R2 assets into one isolated project branch commit before a build. Each file is limited to 16 MiB and the batch to 24 MiB total. Requires confirm=true; validates every path, rejects duplicate destinations and existing files, and commits all selected assets together or none. This is a manual pre-build staging step, not automatic build-time R2 access.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" },
+      project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
+      assets: { type: "array", minItems: 1, maxItems: 20, items: {
+        type: "object", properties: {
+          asset_path: { type: "string", description: "Relative path of an asset already stored in this project's R2 namespace." }
+        }, required: ["asset_path"], additionalProperties: false
+      } },
+      confirm: { type: "boolean" }
+    }, required: ["branch", "project_path", "assets", "confirm"], additionalProperties: false }
+  },
+  {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -916,7 +930,7 @@ async function callTool(name, args, env) {
     return { run_id: runId, job_id: jobId, truncated: logs.length > 20000, logs: logs.slice(-20000) };
   }
 
-  if (["forge_asset_upload","forge_asset_list","forge_asset_delete","forge_asset_download_url","forge_asset_import","forge_asset_multipart_start","forge_asset_multipart_part","forge_asset_multipart_complete","forge_asset_multipart_abort"].includes(name)) {
+  if (["forge_asset_upload","forge_asset_list","forge_asset_delete","forge_asset_download_url","forge_asset_import","forge_asset_import_batch","forge_asset_multipart_start","forge_asset_multipart_part","forge_asset_multipart_complete","forge_asset_multipart_abort"].includes(name)) {
     const bucket = env.FORGE_ASSETS_BUCKET;
     if (!bucket || typeof bucket.put !== "function") throw new Error("External asset storage is not configured. Create a Cloudflare R2 bucket and bind it to this Worker as FORGE_ASSETS_BUCKET; see docs/ASSET-STORAGE.md. No asset was changed.");
     const branch = validateProjectBranch(args.branch);
@@ -928,6 +942,78 @@ async function callTool(name, args, env) {
       throw new Error("asset_path must be a safe relative path without hidden or traversal segments.");
     const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
     const key = prefix + assetPath;
+    if (name === "forge_asset_import_batch") {
+      if (args.confirm !== true) throw new Error("Batch asset staging not performed: confirm=true is required after the user explicitly requests staging the selected assets.");
+      if (!Array.isArray(args.assets) || args.assets.length < 1 || args.assets.length > 20)
+        throw new Error("Select between 1 and 20 assets for one staging batch.");
+      const selected = [];
+      const seen = new Set();
+      for (const entry of args.assets) {
+        const path = entry?.asset_path;
+        if (typeof path !== "string" || !path.length || !/^[A-Za-z0-9._/-]+$/.test(path) ||
+            path.startsWith("/") || path.includes("..") ||
+            path.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) ||
+              /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
+          throw new Error("Every asset_path must be a safe relative path without hidden, traversal, or credential-like segments.");
+        if (seen.has(path)) throw new Error("Duplicate asset_path in batch: " + path);
+        seen.add(path);
+        selected.push({ asset_path: path, destination: validateWorkspacePath(project + "/" + path) });
+      }
+      const parent = await branchHead(env, branch);
+      const currentCommit = await github(env, "git/commits/" + parent);
+      const currentTree = await github(env, "git/trees/" + currentCommit.tree.sha + "?recursive=1");
+      if (currentTree.truncated) throw new Error("Repository tree is too large to safely stage this asset batch.");
+      const existing = new Set((currentTree.tree || []).filter(item => item.type === "blob").map(item => item.path));
+      for (const item of selected) {
+        if (existing.has(item.destination))
+          throw new Error("A destination already exists; no files were overwritten and no commit was created: " + item.destination);
+      }
+      const staged = [];
+      let totalBytes = 0;
+      for (const item of selected) {
+        const object = await bucket.get(prefix + item.asset_path);
+        if (!object) throw new Error("Selected R2 asset not found; no project commit was created: " + item.asset_path);
+        if (typeof object.size === "number" && (object.size <= 0 || object.size > 16 * 1024 * 1024))
+          throw new Error("Each imported asset must be non-empty and no larger than 16 MiB: " + item.asset_path);
+        const bytes = new Uint8Array(await object.arrayBuffer());
+        if (!bytes.length || bytes.length > 16 * 1024 * 1024)
+          throw new Error("Each imported asset must be non-empty and no larger than 16 MiB: " + item.asset_path);
+        totalBytes += bytes.length;
+        if (totalBytes > 24 * 1024 * 1024)
+          throw new Error("The selected batch exceeds the 24 MiB total limit; no project commit was created.");
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000)
+          binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        staged.push({ ...item, bytes: bytes.length, content_type: object.httpMetadata?.contentType || "application/octet-stream",
+          binary });
+      }
+      const treeEntries = [];
+      for (const item of staged) {
+        const blob = await github(env, "git/blobs", {
+          method: "POST",
+          body: JSON.stringify({ content: btoa(item.binary), encoding: "base64" })
+        });
+        treeEntries.push({ path: item.destination, mode: "100644", type: "blob", sha: blob.sha });
+        delete item.binary;
+      }
+      const nextTree = await github(env, "git/trees", {
+        method: "POST",
+        body: JSON.stringify({ base_tree: currentCommit.tree.sha, tree: treeEntries })
+      });
+      const nextCommit = await github(env, "git/commits", {
+        method: "POST",
+        body: JSON.stringify({ message: "FORGE: stage " + staged.length + " external assets", tree: nextTree.sha, parents: [parent] })
+      });
+      await github(env, "git/refs/heads/" + branch, {
+        method: "PATCH",
+        body: JSON.stringify({ sha: nextCommit.sha, force: false })
+      });
+      return { imported: true, atomic_commit: true, branch, project_path: project, files: staged.map(item => ({
+        asset_path: item.asset_path, destination: item.destination, size_bytes: item.bytes, content_type: item.content_type
+      })), file_count: staged.length, total_size_bytes: totalBytes, commit_sha: nextCommit.sha,
+        commit_url: nextCommit.html_url,
+        note: "All selected assets were committed together to the isolated project branch. The next explicitly authorized build can package these files; no build was started." };
+    }
     if (name === "forge_asset_import") {
       if (args.confirm !== true) throw new Error("Asset import not performed: confirm=true is required after the user explicitly requests copying this R2 asset into the project branch.");
       if (!assetPath) throw new Error("asset_path is required.");
@@ -1246,8 +1332,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.7.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.8.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured; use forge_asset_import or forge_asset_import_batch to explicitly stage selected R2 files into the project branch before a separately authorized build. R2 assets are not fetched automatically by GitHub build runners. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
