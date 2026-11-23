@@ -738,6 +738,7 @@ async function callTool(name, args, env) {
     if (assetPath && (typeof assetPath !== "string" || !/^[A-Za-z0-9._/-]+$/.test(assetPath) || assetPath.startsWith("/") || assetPath.includes("..") || assetPath.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) || /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part))))
       throw new Error("asset_path must be a safe relative path without hidden or traversal segments.");
     const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
+    const key = prefix + assetPath;
     if (name.startsWith("forge_asset_multipart_")) {
       if (args.confirm !== true) throw new Error("Multipart operation not performed: confirm=true is required.");
       if (typeof args.upload_id !== "string" && name !== "forge_asset_multipart_start")
@@ -760,7 +761,7 @@ async function callTool(name, args, env) {
         if (!Number.isInteger(n) || n < 1 || n > 10000) throw new Error("part_number must be between 1 and 10000.");
         if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 14913080)
           throw new Error("Each part must contain non-empty base64 data no larger than 10 MiB decoded.");
-        const raw = atob(args.content_base64.replace(/\\s/g,""));
+        const raw = atob(args.content_base64.replace(/\s/g,""));
         if (raw.length > 10 * 1024 * 1024 || raw.length < 1) throw new Error("Each part must be between 1 byte and 10 MiB.");
         if (args.is_last_part !== true && raw.length < 5 * 1024 * 1024)
           throw new Error("Every non-final R2 multipart part must be at least 5 MiB. Set is_last_part=true only for the final part.");
@@ -789,7 +790,6 @@ async function callTool(name, args, env) {
       return { branch, project_path: project, assets: (listed.objects || []).map(o => ({ asset_path: o.key.slice(prefix.length), size_bytes: o.size, uploaded: o.uploaded, etag: o.etag })), truncated: Boolean(listed.truncated), cursor: listed.truncated ? listed.cursor : null };
     }
     if (!assetPath) throw new Error("asset_path is required.");
-    const key = prefix + assetPath;
     if (name === "forge_asset_delete") {
       if (args.confirm !== true) throw new Error("Asset deletion not performed: confirm=true is required after the user explicitly requests deletion.");
       await bucket.delete(key);
