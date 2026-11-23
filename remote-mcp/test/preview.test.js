@@ -82,7 +82,7 @@ test("MCP Apps preview resource is discoverable and safely bundled", async () =>
   const resource = read.body.result.contents[0];
   assert.equal(resource.mimeType, "text/html;profile=mcp-app");
   assert.match(resource.text, /globalThis\.ExtApps/);
-  assert.match(resource.text, /sandbox", "allow-scripts allow-pointer-lock"/);
+  assert.match(resource.text, /setAttribute\("sandbox","allow-scripts allow-pointer-lock"\)/);
   assert.match(resource.text, /setInterval\(checkVersion,60000\)/);
   assert.doesNotMatch(resource.text, /__EXT_APPS_BUNDLE__/);
   assert.equal(resource._meta.ui.prefersBorder, false);
