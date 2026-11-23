@@ -352,7 +352,95 @@ function createSpecialistProjectPlan(args) {
   };
 }
 
-const TOOLS = [
+function validateProjectPlanDocument(plan) {
+  const types = ["web", "android", "flutter", "godot", "unity", "game", "api", "desktop"];
+  if (!plan || typeof plan !== "object" || Array.isArray(plan) || plan.schema_version !== 1 ||
+      !types.includes(plan.project_type) || typeof plan.brief !== "string" ||
+      !Array.isArray(plan.agents) || plan.agents.length < 1 || plan.agents.length > 20 ||
+      !Array.isArray(plan.tasks) || plan.tasks.length < 1 || plan.tasks.length > 50) {
+    throw new Error("Invalid project plan document: expected schema_version 1, a supported project_type, agents, and 1-50 tasks.");
+  }
+  const ids = new Set();
+  for (const task of plan.tasks) {
+    if (!task || typeof task.id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(task.id) ||
+        ids.has(task.id) || typeof task.title !== "string" || !task.title.trim() ||
+        !Array.isArray(task.depends_on)) {
+      throw new Error("Invalid project plan task or duplicate task ID.");
+    }
+    ids.add(task.id);
+  }
+  for (const task of plan.tasks) {
+    if (task.depends_on.some(id => typeof id !== "string" || !ids.has(id) || id === task.id))
+      throw new Error("Project plan contains an invalid task dependency: " + task.id);
+    if (task.status !== undefined && !["pending", "in_progress", "blocked", "completed"].includes(task.status))
+      throw new Error("Project plan contains an invalid task status: " + task.id);
+  }
+  const serialized = JSON.stringify(plan);
+  if (new TextEncoder().encode(serialized).length > 256 * 1024)
+    throw new Error("Project plan must not exceed 256 KiB.");
+  if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(serialized) ||
+      /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\\s*[:=]\\s*[^\\s<>{}]{12,}/i.test(serialized))
+    throw new Error("Project plan must not contain credential values. Store secret names/references only.");
+  return plan;
+}
+
+function validateProjectMemoryTarget(projectPath, branch) {
+  const path = validateWorkspacePath(projectPath, true);
+  if (path === "workspace") throw new Error("Choose a project directory below workspace/.");
+  const selectedBranch = validateProjectBranch(branch);
+  if (selectedBranch === "main" || !selectedBranch.startsWith("forge/projects/"))
+    throw new Error("Project plans can only be stored on an isolated forge/projects/ branch.");
+  return { path: path + "/FORGE_PLAN.json", branch: selectedBranch };
+}
+
+const TOOLS = [  {
+    name: "forge_project_plan_read",
+    description: "Read the saved FORGE_PLAN.json roadmap and task statuses from an isolated project branch. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Project directory, for example workspace/my-app." },
+        branch: { type: "string", description: "Existing forge/projects/ branch." }
+      },
+      required: ["project_path", "branch"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_plan_save",
+    description: "Save a generated specialist project plan as FORGE_PLAN.json on an isolated project branch. Requires confirm=true; updates to an existing plan require expected_sha from forge_project_plan_read.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string" },
+        branch: { type: "string" },
+        plan: { type: "object", description: "A schema_version 1 plan returned by forge_project_plan." },
+        expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+        confirm: { type: "boolean" }
+      },
+      required: ["project_path", "branch", "plan", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_task_update",
+    description: "Update one saved task's status and append a bounded progress note in FORGE_PLAN.json. Requires confirm=true and expected_sha from the latest forge_project_plan_read; stale updates are rejected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string" },
+        branch: { type: "string" },
+        task_id: { type: "string", minLength: 1, maxLength: 24 },
+        status: { type: "string", enum: ["pending", "in_progress", "blocked", "completed"] },
+        note: { type: "string", maxLength: 2000 },
+        expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+        confirm: { type: "boolean" }
+      },
+      required: ["project_path", "branch", "task_id", "status", "expected_sha", "confirm"],
+      additionalProperties: false
+    }
+  },
+
   {
     name: "forge_project_plan",
     description: "Create a structured project plan with specialist handoffs for product, architecture, UX, platform engineering, QA, security, and release. Planning only: does not spawn other AI models, write files, run commands, dispatch builds, or call paid services.",
@@ -786,6 +874,84 @@ const TOOLS = [
 ];
 
 async function callTool(name, args, env) {
+  if (name === "forge_project_plan_read") {
+    const target = validateProjectMemoryTarget(args.project_path, args.branch);
+    const file = await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env);
+    let plan;
+    try { plan = JSON.parse(file.content); } catch { throw new Error("Saved FORGE_PLAN.json is not valid JSON."); }
+    validateProjectPlanDocument(plan);
+    return { ...plan, storage: { path: target.path, branch: target.branch, sha: file.sha } };
+  }
+
+  if (name === "forge_project_plan_save") {
+    if (args.confirm !== true) throw new Error("Project plan not saved: confirm=true is required.");
+    const target = validateProjectMemoryTarget(args.project_path, args.branch);
+    const plan = validateProjectPlanDocument(args.plan);
+    const current = await (async () => {
+      try { return await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env); }
+      catch (error) {
+        if (String(error?.message || error).includes("GitHub API 404")) return null;
+        throw error;
+      }
+    })();
+    if (current && !args.expected_sha)
+      throw new Error("Existing FORGE_PLAN.json requires expected_sha from forge_project_plan_read.");
+    if (current && current.sha !== args.expected_sha)
+      throw new Error("Stale project plan version; read the latest plan before updating.");
+    if (!current && args.expected_sha)
+      throw new Error("expected_sha was supplied but FORGE_PLAN.json does not exist.");
+    const savedPlan = JSON.parse(JSON.stringify(plan));
+    savedPlan.created_at = savedPlan.created_at || new Date().toISOString();
+    savedPlan.updated_at = new Date().toISOString();
+    savedPlan.tasks = savedPlan.tasks.map(task => ({ ...task, status: task.status || "pending" }));
+    validateProjectPlanDocument(savedPlan);
+    const saved = await callTool("forge_workspace_write", {
+      path: target.path, branch: target.branch, content: JSON.stringify(savedPlan, null, 2),
+      ...(args.expected_sha ? { expected_sha: args.expected_sha } : {}), confirm: true
+    }, env);
+    return { ...saved, task_count: savedPlan.tasks.length, project_type: savedPlan.project_type,
+      note: "Plan saved to the isolated project branch. No tasks were executed." };
+  }
+
+  if (name === "forge_project_task_update") {
+    if (args.confirm !== true) throw new Error("Task status was not changed: confirm=true is required.");
+    if (typeof args.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(args.expected_sha))
+      throw new Error("expected_sha from the latest forge_project_plan_read is required.");
+    if (typeof args.task_id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(args.task_id))
+      throw new Error("Invalid task_id.");
+    if (!["pending", "in_progress", "blocked", "completed"].includes(args.status))
+      throw new Error("Unsupported task status.");
+    const note = args.note === undefined ? "" : args.note;
+    if (typeof note !== "string" || note.length > 2000) throw new Error("Task note must be text no longer than 2000 characters.");
+    if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(note) ||
+        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)\\s*[:=]\\s*[^\\s<>{}]{12,}/i.test(note))
+      throw new Error("Task notes must not contain credential values.");
+    const target = validateProjectMemoryTarget(args.project_path, args.branch);
+    const file = await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env);
+    if (file.sha !== args.expected_sha) throw new Error("Stale project plan version; read the latest plan before updating a task.");
+    let plan;
+    try { plan = JSON.parse(file.content); } catch { throw new Error("Saved FORGE_PLAN.json is not valid JSON."); }
+    validateProjectPlanDocument(plan);
+    const task = plan.tasks.find(item => item.id === args.task_id);
+    if (!task) throw new Error("Task not found in saved project plan: " + args.task_id);
+    const now = new Date().toISOString();
+    task.status = args.status;
+    task.updated_at = now;
+    if (args.status === "completed") task.completed_at = now;
+    else delete task.completed_at;
+    task.updates = Array.isArray(task.updates) ? task.updates.slice(-19) : [];
+    task.updates.push({ status: args.status, note, updated_at: now });
+    plan.updated_at = now;
+    validateProjectPlanDocument(plan);
+    const saved = await callTool("forge_workspace_write", {
+      path: target.path, branch: target.branch, content: JSON.stringify(plan, null, 2),
+      expected_sha: file.sha, confirm: true
+    }, env);
+    return { ...saved, task_id: task.id, status: task.status, updated_at: now,
+      note: "Task status saved to FORGE_PLAN.json. No task execution or build was started." };
+  }
+
+
   if (name === "forge_project_plan") return createSpecialistProjectPlan(args);
   if (name === "forge_project_branch_create") {
     if (args.confirm !== true) throw new Error("Branch creation not performed: confirm=true is required after the user asks to create a project.");
