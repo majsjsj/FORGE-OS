@@ -24,5 +24,7 @@ jobs:
         run: node --check studio/studio.js
       - name: Check Studio feature modules JavaScript
         run: node --check studio/features.js
+      - name: Check advanced Studio tools JavaScript
+        run: node --check studio/advanced-tools.js
       - name: Check remote MCP Worker JavaScript
         run: node --check remote-mcp/src/index.js
