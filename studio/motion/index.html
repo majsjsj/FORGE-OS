@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131b"><title>FORGE MOTION — Creative Production Studio</title>
+<link rel="stylesheet" href="motion.css">
+</head>
+<body>
+<div class="app">
+<header class="topbar"><a class="brand" href="../index.html"><span class="mark">F</span> FORGE <b>MOTION</b></a><div class="project-label"><span class="live-dot"></span><span id="projectNameLabel">UNTITLED PRODUCTION</span></div><div class="top-actions"><button id="newProjectBtn" class="quiet">NEW</button><button id="importBtn" class="quiet">IMPORT</button><button id="exportBtn" class="primary">EXPORT PROJECT ↗</button><input id="importFile" type="file" accept="application/json" hidden></div></header>
+<main class="shell">
+<aside class="rail">
+<div class="eyebrow">PRODUCTION</div>
+<button class="nav active" data-panel="brief">01 <span>Creative brief</span></button>
+<button class="nav" data-panel="storyboard">02 <span>Storyboard</span></button>
+<button class="nav" data-panel="timeline">03 <span>Timeline</span></button>
+<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button>
+<div class="rail-bottom"><div class="eyebrow">WORKSPACE STATUS</div><div class="status-line"><i></i> LOCAL PROJECT</div><p>Your project is saved in this browser. No cloud rendering or external AI service is invoked by this page.</p><a href="../index.html">← Back to FORGE Studio</a></div>
+</aside>
+<section class="content">
+<section class="panel active" id="panel-brief">
+<div class="heading"><div><div class="eyebrow">START WITH AN IDEA</div><h1>Creative brief</h1><p>Describe the film. Shape its visual language. Turn the idea into editable production shots.</p></div><span class="tag">PRE-PRODUCTION</span></div>
+<div class="grid-two">
+<div class="card">
+<label for="projectName">PROJECT NAME</label><input id="projectName" value="Untitled production" maxlength="80">
+<label for="brief">YOUR IDEA / VOICE TRANSCRIPT</label><textarea id="brief" rows="7" placeholder="A stickman discovers a mysterious city... Describe the story, product, mood, action and ending."></textarea>
+<div class="hint">Paste a transcript from your voice recording here. Automatic speech recognition and AI scene generation require a connected model/service and are not active in this first UI milestone.</div>
+<div class="row"><button id="makeScenesBtn" class="primary">CREATE STARTER STORYBOARD</button><button id="clearBriefBtn" class="quiet">CLEAR</button></div>
+</div>
+<div class="card">
+<div class="card-title">VISUAL DIRECTION</div>
+<label for="style">STYLE</label><select id="style"><option>Stickman 2D</option><option>2D cartoon</option><option>Anime</option><option>Hand-drawn</option><option>3D cartoon</option><option>3D realistic</option><option>Fantasy 3D</option><option>Product advertising</option><option>Photoreal Blender</option><option>Stop motion</option><option>Motion graphics</option></select>
+<label for="format">FRAME FORMAT</label><select id="format"><option value="16:9">16:9 · YouTube / cinematic</option><option value="9:16">9:16 · Shorts / Reels</option><option value="1:1">1:1 · Square</option><option value="4:5">4:5 · Social portrait</option><option value="2.39:1">2.39:1 · Cinema</option></select>
+<label for="quality">TARGET OUTPUT</label><select id="quality"><option>Storyboard preview</option><option>HD 1080p</option><option>4K UHD</option></select>
+<label for="duration">TARGET LENGTH</label><select id="duration"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option><option value="180">3 minutes</option></select>
+<label for="mood">MOOD / ART DIRECTION</label><input id="mood" placeholder="Dramatic, playful, premium, suspenseful...">
+<div class="hint">These settings guide the editable shot plan. They do not claim to render a finished video.</div>
+</div>
+</div>
+<div class="card workflow"><div class="card-title">PRODUCTION PIPELINE</div><div class="pipeline"><span>Brief</span><b>→</b><span>Script</span><b>→</b><span>Storyboard</span><b>→</b><span>Animation</span><b>→</b><span>Sound</span><b>→</b><span>Final export</span></div><p>FORGE MOTION starts with a structured, editable production plan. Render adapters for Blender, 2D animation and AI video providers are separate integration milestones.</p></div>
+</section>
+<section class="panel" id="panel-storyboard">
+<div class="heading"><div><div class="eyebrow">SHOT DESIGN</div><h1>Storyboard</h1><p>Build scenes and direct each shot, camera move, action, lighting and sound cue.</p></div><button id="addSceneBtn" class="primary">+ ADD SCENE</button></div>
+<div id="sceneList" class="scene-list"><div class="empty">No scenes yet. Create a starter storyboard from your brief.</div></div>
+</section>
+<section class="panel" id="panel-timeline">
+<div class="heading"><div><div class="eyebrow">EDIT & ASSEMBLE</div><h1>Timeline</h1><p>Arrange your shots and adjust their duration before the editing backend is connected.</p></div><div class="tag" id="totalDuration">0.0 SEC</div></div>
+<div class="card"><div class="timeline-head"><span>VIDEO TRACK · V1</span><span>AUDIO NOTES · A1</span></div><div id="timelineTracks" class="tracks"><div class="empty">Your scene clips will appear here.</div></div></div>
+<div class="card"><div class="card-title">EDITING CHECKLIST</div><div class="check-grid"><label><input type="checkbox"> Shot order reviewed</label><label><input type="checkbox"> Character continuity checked</label><label><input type="checkbox"> Camera moves reviewed</label><label><input type="checkbox"> Dialogue timed</label><label><input type="checkbox"> Sound effects planned</label><label><input type="checkbox"> Final aspect ratio checked</label></div></div>
+</section>
+<section class="panel" id="panel-sound">
+<div class="heading"><div><div class="eyebrow">VOICE & SOUND</div><h1>Audio direction</h1><p>Attach a reference recording, keep a transcript, and plan dialogue, music and effects.</p></div><span class="tag">LOCAL AUDIO</span></div>
+<div class="grid-two">
+<div class="card"><div class="card-title">REFERENCE VOICE RECORDING</div><label class="upload" for="audioFile">＋ CHOOSE AUDIO FILE<input id="audioFile" type="file" accept="audio/*"></label><audio id="audioPlayer" controls hidden></audio><div id="audioMeta" class="hint">Audio stays in this browser session; this page does not upload it to a server.</div><label for="transcript">TRANSCRIPT / SPOKEN BRIEF</label><textarea id="transcript" rows="8" placeholder="Paste the words spoken in your recording..."></textarea></div>
+<div class="card"><div class="card-title">SOUND DESIGN</div><label for="voiceStyle">VOICE STYLE</label><select id="voiceStyle"><option>Natural narration</option><option>Energetic commercial</option><option>Character dialogue</option><option>Documentary</option><option>No voice</option></select><label for="music">MUSIC DIRECTION</label><input id="music" placeholder="Orchestral tension, upbeat pop..."><label for="sfx">SOUND EFFECTS</label><textarea id="sfx" rows="5" placeholder="Impacts, footsteps, ambience, whooshes..."></textarea><div class="hint">Voice synthesis, transcription and audio-to-animation synchronization will be connected through provider adapters in a later milestone.</div></div>
+</div>
+</section>
+</section>
+<aside class="inspector">
+<div class="eyebrow">SHOT MONITOR</div><div class="monitor" id="monitor"><div class="monitor-art"><span>FORGE</span><b>MOTION</b><small>PREVIEW CANVAS</small></div></div>
+<div class="monitor-meta"><span id="monitorScene">NO SHOT SELECTED</span><span id="monitorFormat">16:9</span></div>
+<div class="card compact"><div class="card-title">SELECTED SHOT</div><div id="shotInspector" class="hint">Select a scene to edit its production details.</div></div>
+<div class="render-note"><b>Render status</b><span class="status-pill">PLANNING MODE</span><p>Actual video rendering is not connected yet. This workspace creates and exports an editable production plan.</p></div>
+</aside>
+</main>
+<footer class="footer"><span>FORGE MOTION · CREATIVE PRODUCTION</span><span id="saveStatus">SAVED LOCALLY</span><span>NO CLOUD JOBS RUNNING</span></footer>
+</div>
+<script src="motion.js"></script>
+</body></html>
