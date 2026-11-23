@@ -19,6 +19,8 @@ jobs:
           python-version: "3.11"
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a
       - run: uv sync --dev
+      - name: Enforce immutable external GitHub Actions references
+        run: python scripts/verify_actions_pinned.py
       - run: uv run pytest
       - run: uv run ruff check .
       - name: Check blank workspace JavaScript
