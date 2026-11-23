@@ -110,6 +110,30 @@ jobs:
           fi
           test -s "$RUNNER_TEMP/forge-web-output/index.html"
           echo "Prepared deployable web output only; dependencies and repository metadata are excluded."
+      - name: Create artifact integrity manifest
+        env:
+          ARTIFACT_ROOT: ${{ runner.temp }}/forge-web-output
+          ENGINE: web
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ARTIFACT_ROOT"]).resolve()
+          if not root.is_dir():
+              raise SystemExit(f"Artifact directory missing: {root}")
+          files = []
+          for path in sorted(root.rglob("*")):
+              if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
+                  continue
+              data = path.read_bytes()
+              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+          if not files:
+              raise SystemExit("No files found to include in the artifact integrity manifest.")
+          manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          print(f"Manifest created for {len(files)} files.")
+          PY
       - uses: actions/upload-artifact@v4
         if: success() && inputs.output == 'web'
         with:
@@ -221,6 +245,31 @@ jobs:
           if [ "$OUTPUT" = apk ]; then flutter build apk --release;
           elif [ "$OUTPUT" = aab ]; then flutter build appbundle --release;
           elif [ "$OUTPUT" != test ]; then echo "Flutter output must be test, apk, or aab"; exit 1; fi
+      - name: Create artifact integrity manifest
+        if: success() && (inputs.output == 'apk' || inputs.output == 'aab')
+        env:
+          ARTIFACT_ROOT: ${{ inputs.project_path }}/build/app/outputs
+          ENGINE: flutter
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ARTIFACT_ROOT"]).resolve()
+          if not root.is_dir():
+              raise SystemExit(f"Artifact directory missing: {root}")
+          files = []
+          for path in sorted(root.rglob("*")):
+              if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
+                  continue
+              data = path.read_bytes()
+              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+          if not files:
+              raise SystemExit("No files found to include in the artifact integrity manifest.")
+          manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          print(f"Manifest created for {len(files)} files.")
+          PY
       - uses: actions/upload-artifact@v4
         if: success() && (inputs.output == 'apk' || inputs.output == 'aab')
         with:
@@ -389,6 +438,31 @@ jobs:
             godot --headless --path "$PROJECT_PATH" --export-release "Linux" "build/linux.x86_64"
             test -s "$PROJECT_PATH/build/linux.x86_64"
           fi
+      - name: Create artifact integrity manifest
+        if: success() && (inputs.output == 'apk' || inputs.output == 'aab' || inputs.output == 'linux' || inputs.output == 'web')
+        env:
+          ARTIFACT_ROOT: ${{ inputs.project_path }}/build
+          ENGINE: godot
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ARTIFACT_ROOT"]).resolve()
+          if not root.is_dir():
+              raise SystemExit(f"Artifact directory missing: {root}")
+          files = []
+          for path in sorted(root.rglob("*")):
+              if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
+                  continue
+              data = path.read_bytes()
+              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+          if not files:
+              raise SystemExit("No files found to include in the artifact integrity manifest.")
+          manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          print(f"Manifest created for {len(files)} files.")
+          PY
       - uses: actions/upload-artifact@v4
         if: success() && (inputs.output == 'apk' || inputs.output == 'aab' || inputs.output == 'linux' || inputs.output == 'web')
         with:
@@ -486,6 +560,31 @@ jobs:
           projectPath: ${{ inputs.project_path }}
           targetPlatform: StandaloneLinux64
           buildsPath: build
+      - name: Create artifact integrity manifest
+        if: success()
+        env:
+          ARTIFACT_ROOT: ${{ inputs.project_path }}/build
+          ENGINE: unity
+          OUTPUT: ${{ inputs.output }}
+        run: |
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path(os.environ["ARTIFACT_ROOT"]).resolve()
+          if not root.is_dir():
+              raise SystemExit(f"Artifact directory missing: {root}")
+          files = []
+          for path in sorted(root.rglob("*")):
+              if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
+                  continue
+              data = path.read_bytes()
+              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+          if not files:
+              raise SystemExit("No files found to include in the artifact integrity manifest.")
+          manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
+          (root / "forge-artifact-manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n", encoding="utf-8")
+          print(f"Manifest created for {len(files)} files.")
+          PY
       - uses: actions/upload-artifact@v4
         if: success()
         with:
