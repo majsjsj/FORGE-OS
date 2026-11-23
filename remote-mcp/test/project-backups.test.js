@@ -39,7 +39,9 @@ async function callTool(name, args, fetchMock) {
     ), { FORGE_ACCESS_TOKEN: accessToken, GITHUB_TOKEN: "mock-github-token" });
     const payload = await response.json();
     const text = payload.result?.content?.[0]?.text || "";
-    return { payload, value: text ? JSON.parse(text) : null };
+    let value = text;
+    try { value = text ? JSON.parse(text) : null; } catch {}
+    return { payload, value };
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -62,8 +64,8 @@ test("backup creation requires explicit confirmation and makes no GitHub request
     return githubResponse({});
   });
 
-  assert.equal(result.payload.error, true);
-  assert.match(result.payload.content[0].text, /confirm=true/);
+  assert.equal(result.payload.result.isError, true);
+  assert.match(result.payload.result.content[0].text, /confirm=true/);
   assert.equal(requests, 0);
 });
 
@@ -92,7 +94,7 @@ test("backup creation pins the isolated branch's current commit without changing
     assert.fail(`Unexpected GitHub request: ${options.method || "GET"} ${path}`);
   });
 
-  assert.equal(result.payload.error, undefined);
+  assert.equal(result.payload.result.isError, false);
   assert.equal(result.value.created, true);
   assert.equal(result.value.commit_sha, sourceSha);
   assert.equal(result.value.project_branch, projectBranch);
