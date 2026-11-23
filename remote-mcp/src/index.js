@@ -425,6 +425,19 @@ const TOOLS = [
     }
   },
   {
+    name: "forge_project_task_monitor",
+    description: "Read a saved FORGE_PLAN.json and calculate which tasks are ready, active, blocked by dependencies, or complete. Safe read-only checkpoint for manual/event-triggered monitoring; never executes tasks or starts builds.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project_path: { type: "string", description: "Project directory, for example workspace/my-app." },
+        branch: { type: "string", description: "Existing forge/projects/ branch." }
+      },
+      required: ["project_path", "branch"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_project_plan_save",
     description: "Save a generated specialist project plan as FORGE_PLAN.json on an isolated project branch. Requires confirm=true; updates to an existing plan require expected_sha from forge_project_plan_read.",
     inputSchema: {
@@ -899,6 +912,43 @@ async function callTool(name, args, env) {
     try { plan = JSON.parse(file.content); } catch { throw new Error("Saved FORGE_PLAN.json is not valid JSON."); }
     validateProjectPlanDocument(plan);
     return { ...plan, storage: { path: target.path, branch: target.branch, sha: file.sha } };
+  }
+
+  if (name === "forge_project_task_monitor") {
+    const target = validateProjectMemoryTarget(args.project_path, args.branch);
+    const file = await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env);
+    let plan;
+    try { plan = JSON.parse(file.content); } catch { throw new Error("Saved FORGE_PLAN.json is not valid JSON."); }
+    validateProjectPlanDocument(plan);
+    const byId = new Map(plan.tasks.map(task => [task.id, task]));
+    const completed = plan.tasks.filter(task => task.status === "completed");
+    const inProgress = plan.tasks.filter(task => task.status === "in_progress");
+    const blocked = plan.tasks.filter(task => task.status === "blocked" ||
+      task.depends_on.some(id => byId.get(id).status !== "completed"));
+    const ready = plan.tasks.filter(task => task.status !== "completed" && task.status !== "blocked" &&
+      task.depends_on.every(id => byId.get(id).status === "completed"));
+    const summarize = task => ({
+      id: task.id, title: task.title, status: task.status || "pending",
+      depends_on: task.depends_on,
+      waiting_for: task.depends_on.filter(id => byId.get(id).status !== "completed")
+    });
+    return {
+      project_path: args.project_path, branch: target.branch,
+      plan_updated_at: plan.updated_at || plan.created_at || null,
+      storage: { path: target.path, sha: file.sha },
+      counts: { total: plan.tasks.length, completed: completed.length,
+        in_progress: inProgress.length, ready: ready.length, blocked: blocked.length },
+      ready_tasks: ready.map(summarize),
+      in_progress_tasks: inProgress.map(summarize),
+      blocked_tasks: blocked.map(summarize),
+      completed_tasks: completed.map(summarize),
+      next_action: ready.length
+        ? "Choose one ready task and perform its specialist work. Update its status only after explicit approval."
+        : completed.length === plan.tasks.length
+          ? "All planned tasks are marked completed; review QA, security, and release evidence before declaring delivery."
+          : "No task is currently ready. Resolve blocked dependencies or update task statuses after reviewing the latest plan.",
+      note: "Read-only checkpoint. No files were changed, tasks were not executed, and no tests or builds were started."
+    };
   }
 
   if (name === "forge_project_plan_save") {
