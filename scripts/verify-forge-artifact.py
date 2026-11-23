@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify a FORGE artifact manifest and every file it describes."""
 import argparse
 import hashlib
@@ -27,7 +26,7 @@ def main() -> int:
         fail("Artifact manifest is missing or unsafe.")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
         fail(f"Artifact manifest is not valid JSON: {exc}")
     if not isinstance(manifest, dict) or manifest.get("format") != "forge-artifact-manifest-v1":
         fail("Unsupported artifact manifest format.")
@@ -71,8 +70,8 @@ def main() -> int:
             fail(f"Artifact SHA-256 mismatch: {rel}")
 
     print(
-        "Verified %d artifact file(s) for %s/%s."
-        % (len(entries), manifest.get("engine", "unknown"), manifest.get("output", "unknown"))
+        f"Verified {len(entries)} artifact file(s) for "
+        f"{manifest.get('engine', 'unknown')}/{manifest.get('output', 'unknown')}."
     )
     return 0
 
