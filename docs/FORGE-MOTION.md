@@ -1,51 +1,30 @@
-# FORGE MOTION
+# FORGE MOTION — production architecture and current status
 
-FORGE MOTION is the creative-production workspace within FORGE-OS for planning 2D/3D animation, product advertising, cinematic shots, voice-led video concepts, and editable timelines.
+## Implemented browser-side post-production milestone
 
-## Current implementation
+- Local rendered-video preview (user selects a video file; no upload).
+- Optional external audio track with play/pause/seek synchronization against preview time.
+- Caption cue editor with start/end time and text.
+- SRT and WebVTT import/export.
+- Caption style controls: font, size, foreground/background colors, opacity, vertical position, entrance effect.
+- Optional approximate word-level cue splitting for karaoke-style highlighting.
+- Fullscreen preview and local browser-only media handling.
 
-- Standalone studio entry: `studio/motion/index.html`.
-- Creative brief with visual style, aspect ratio, target duration and output target.
-- Starter storyboard generation from user-provided text (deterministic shot breakdown; not an AI model call).
-- Editable scenes with shot descriptions, camera direction, character/object action, lighting, sound cues and duration.
-- Scene ordering, duplication, deletion and a visual timeline representation.
-- Local browser autosave and JSON project import/export.
-- Local audio-file preview and transcript field. The audio is not uploaded or transcribed by this page.
-- Explicit planning-mode status so the interface does not misrepresent a storyboard as rendered video.
+## Timing accuracy
 
-## Production architecture
+Subtitle cue timing follows the media player's playback clock. Imported SRT/VTT cues retain their timestamps. Splitting a sentence evenly into words is only an approximate convenience, not speech recognition or forced alignment. Frame-accurate/word-accurate alignment requires a speech-to-text/forced-alignment backend, known media frame rate/timebase, and human review. Burned-in subtitles and muxed audio/video require the render/export worker; this UI only previews overlays.
 
-The full production system should use provider-neutral adapters and a durable project/asset model:
+## Full production system — eight delivery tracks
 
-1. **Director / Claude MCP** — interpret text or transcribed voice, generate script, shot list, character bible, storyboard and production instructions.
-2. **Asset & continuity service** — character sheets, reusable props, environments, style references, versioned assets and consistency checks.
-3. **2D animation adapter** — rigged vector/cut-out animation and frame-based workflows (including stick figures).
-4. **Blender adapter** — headless Blender scene generation, camera rigs, lighting, materials, simulation and rendering.
-5. **Video generation adapters** — optional providers for text/image/audio-to-video shots; keep provider keys server-side and make provider choice explicit.
-6. **Audio pipeline** — speech-to-text, voice-over/TTS where licensed, dialogue timing, music and sound-effect tracks.
-7. **Timeline / compositor** — editable shot timeline, transitions, titles, color and audio mix; render through FFmpeg or another validated compositor.
-8. **Render queue** — isolated jobs, quotas, cancellation, progress, artifact storage, retries and per-user access controls.
+1. **Director and MCP:** structured project schema, model-generated script/shot plan, voice transcription, shot breakdown and revision loop.
+2. **Character and asset continuity:** character bible, reference images, reusable props/environments, asset versioning and continuity checks.
+3. **2D / Stickman:** rig definitions, keyframes, interpolation, camera layers, SVG/Canvas renderer and export.
+4. **Blender / 3D advertising:** Blender Python scene templates, camera rigs, lighting/material presets, product turntables, simulations and headless rendering on an isolated worker.
+5. **3D / AI video adapters:** pluggable generation providers, per-shot references, explicit provider selection, server-side keys, user consent and spend estimates.
+6. **Audio:** transcription, voice-over/TTS where licensed, dialogue/music/SFX tracks, loudness normalization and forced alignment.
+7. **Timeline / compositor:** multitrack video/audio/caption editing, transitions, titles, color pipeline, frame-accurate timebase and subtitle burn-in.
+8. **Render queue / delivery:** isolated workers, progress, cancellation, retries, artifact storage, MP4/WebM export and end-to-end QA.
 
-## Safety, cost and capability gates
+## Not yet implemented or verified
 
-- Never send audio, prompts, assets or provider credentials to a third party without a clear user action and disclosure.
-- Keep provider API keys server-side; never put secrets in browser JavaScript or public GitHub files.
-- Require explicit confirmation before paid generation, cloud rendering or long-running jobs.
-- Do not promise a finished video until an end-to-end render has been tested.
-- Blender rendering needs a worker with Blender installed; browser GitHub Pages alone cannot render Blender scenes.
-- A project JSON export is a production plan, not an MP4, animation file or Blender project.
-
-## Milestones
-
-- [x] Motion workspace foundation and navigation target.
-- [x] Editable storyboard and shot metadata.
-- [x] Local project persistence and JSON interchange.
-- [x] Timeline planning and audio reference preview.
-- [ ] MCP tools for create/update/list/export motion projects.
-- [ ] Structured script/shot generation through the configured model.
-- [ ] Character bible and visual continuity assets.
-- [ ] 2D stickman and 2D rigged animation renderer.
-- [ ] Blender scene builder and validated render worker.
-- [ ] Audio transcription, voice generation and synchronization adapters.
-- [ ] Video provider adapters with consent and spend controls.
-- [ ] Full timeline compositor, MP4 export and end-to-end quality tests.
+The UI does not itself provide AI transcription, generated video, Blender rendering, 2D/3D character animation, a multitrack compositor, or final MP4 export. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
