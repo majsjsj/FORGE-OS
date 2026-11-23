@@ -48,6 +48,8 @@ def main() -> int:
         posix = PurePosixPath(rel)
         if posix.is_absolute() or posix.as_posix() != rel or any(part in ("", ".", "..") for part in posix.parts):
             fail(f"Unsafe artifact path: {rel}")
+        if rel == "forge-artifact-manifest.json":
+            fail("The manifest cannot list itself as an artifact subject.")
         if rel in seen:
             fail(f"Duplicate artifact path: {rel}")
         seen.add(rel)
@@ -68,6 +70,17 @@ def main() -> int:
                 digest.update(chunk)
         if digest.hexdigest() != expected_hash:
             fail(f"Artifact SHA-256 mismatch: {rel}")
+
+    actual_files = set()
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            fail(f"Artifact contains a symbolic link: {path.relative_to(root).as_posix()}")
+        if path.is_file() and path != manifest_path:
+            actual_files.add(path.relative_to(root).as_posix())
+    if actual_files != seen:
+        extra = sorted(actual_files - seen)
+        missing = sorted(seen - actual_files)
+        fail(f"Artifact files do not exactly match the manifest. Unlisted={extra[:10]}, missing={missing[:10]}")
 
     print(
         f"Verified {len(entries)} artifact file(s) for "
