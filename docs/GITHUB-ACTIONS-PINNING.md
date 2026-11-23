@@ -4,12 +4,14 @@ All external actions referenced by the workflows in this repository are pinned t
 
 ## Verification basis
 
-Each SHA was resolved from the corresponding upstream repository's Git reference for the version tag previously used by FORGE-OS on 2026-11-23. The resulting Git reference directly identified a commit object (not an annotated tag object). The pinned versions are:
+Each SHA was resolved from the corresponding upstream repository's Git reference for the version tag used by FORGE-OS on 2026-11-23. Annotated tags were dereferenced to their target commit before pinning. The pinned versions are:
 
 | Action | Version tag | Commit SHA |
 |---|---|---|
 | actions/checkout | v4 | 11d5960a326750d5838078e36cf38b85af677262 |
 | actions/setup-node | v4 | 49933ea5288caeca8642d1e84afbd3f7d6820020 |
+| actions/setup-python | v5 | a26af69be951a213d495a4c3e4e4022e16d87065 |
+| astral-sh/setup-uv | v4 | 38f3f104447c67c051c4a08e39b64a148898af3a |
 | actions/configure-pages | v5 | 983d7736d9b0ae728b81ab479565c72886d7745b |
 | actions/github-script | v7 | f28e40c7f34bde8b3046d885e986cb6290c5673b |
 | actions/upload-pages-artifact | v3 | 56afc609e74202658d3ffba0e8f6dda462b719fa |
