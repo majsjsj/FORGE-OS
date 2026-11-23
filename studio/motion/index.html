@@ -14,7 +14,7 @@
 <button class="nav active" data-panel="brief">01 <span>Creative brief</span></button>
 <button class="nav" data-panel="storyboard">02 <span>Storyboard</span></button>
 <button class="nav" data-panel="timeline">03 <span>Timeline</span></button>
-<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button>
+<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button>
 <div class="rail-bottom"><div class="eyebrow">WORKSPACE STATUS</div><div class="status-line"><i></i> LOCAL PROJECT</div><p>Your project is saved in this browser. No cloud rendering or external AI service is invoked by this page.</p><a href="../index.html">← Back to FORGE Studio</a></div>
 </aside>
 <section class="content">
@@ -55,6 +55,41 @@
 <div class="card"><div class="card-title">SOUND DESIGN</div><label for="voiceStyle">VOICE STYLE</label><select id="voiceStyle"><option>Natural narration</option><option>Energetic commercial</option><option>Character dialogue</option><option>Documentary</option><option>No voice</option></select><label for="music">MUSIC DIRECTION</label><input id="music" placeholder="Orchestral tension, upbeat pop..."><label for="sfx">SOUND EFFECTS</label><textarea id="sfx" rows="5" placeholder="Impacts, footsteps, ambience, whooshes..."></textarea><div class="hint">Voice synthesis, transcription and audio-to-animation synchronization will be connected through provider adapters in a later milestone.</div></div>
 </div>
 </section>
+<section class="panel" id="panel-post">
+<div class="heading"><div><div class="eyebrow">POST-PRODUCTION</div><h1>Video preview & captions</h1><p>Preview a rendered clip locally, synchronize subtitles and export timed caption files.</p></div><span class="tag">LOCAL PREVIEW</span></div>
+<div class="card">
+<div class="card-title">VIDEO / AUDIO SOURCES</div>
+<div class="grid-two">
+<div><label class="upload" for="motionVideoFile">＋ LOAD VIDEO FOR PREVIEW<input id="motionVideoFile" type="file" accept="video/*"></label><div id="motionVideoMeta" class="hint">Choose an MP4/WebM render to preview. The file stays in this browser session.</div></div>
+<div><label class="upload" for="motionAudioFile">＋ LOAD EXTERNAL AUDIO<input id="motionAudioFile" type="file" accept="audio/*"></label><div id="motionAudioMeta" class="hint">Optional separate narration/music track. It follows preview play/pause and seeking.</div></div>
+</div>
+</div>
+<div class="card">
+<div class="card-title">CINEMATIC PREVIEW</div>
+<div class="video-stage" id="motionVideoStage"><video id="motionVideo" controls playsinline preload="metadata"></video><div id="captionOverlay" class="caption-overlay position-bottom"></div><div class="preview-placeholder" id="motionVideoPlaceholder">LOAD A VIDEO TO START PREVIEW</div></div>
+<div class="preview-controls"><span id="motionTimecode">00:00.000</span><span id="motionSyncStatus">CAPTIONS READY · 0 CUES</span><button id="motionFullscreen" class="quiet">FULLSCREEN</button></div>
+<audio id="motionExternalAudio" hidden></audio>
+</div>
+<div class="grid-two">
+<div class="card">
+<div class="card-title">CAPTION TRACK</div>
+<div class="row"><button id="addCaptionCue" class="primary">+ ADD CAPTION</button><button id="splitCaptionWords" class="quiet">SPLIT INTO WORDS</button></div>
+<div class="row"><label class="upload compact-upload" for="captionImport">IMPORT SRT / VTT<input id="captionImport" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip"></label><button id="exportSrt" class="quiet">EXPORT SRT</button><button id="exportVtt" class="quiet">EXPORT VTT</button></div>
+<div id="captionCueList" class="caption-cue-list"><div class="empty">Add a caption or import an SRT/VTT file.</div></div>
+</div>
+<div class="card">
+<div class="card-title">CAPTION DESIGN</div>
+<label for="captionFont">FONT</label><select id="captionFont"><option value="Arial, sans-serif">Arial / Sans</option><option value="Georgia, serif">Georgia / Serif</option><option value="system-ui, sans-serif">System</option><option value="monospace">Monospace</option></select>
+<label for="captionSize">SIZE</label><input id="captionSize" type="range" min="16" max="64" value="32">
+<label for="captionColor">TEXT COLOR</label><input id="captionColor" type="color" value="#ffffff">
+<label for="captionBg">BACKGROUND</label><input id="captionBg" type="color" value="#000000">
+<label for="captionOpacity">BACKGROUND OPACITY</label><input id="captionOpacity" type="range" min="0" max="100" value="72">
+<label for="captionPosition">POSITION</label><select id="captionPosition"><option value="bottom">Bottom center</option><option value="middle">Middle center</option><option value="top">Top center</option></select>
+<label for="captionAnimation">ENTRANCE ANIMATION</label><select id="captionAnimation"><option value="none">None</option><option value="fade">Fade</option><option value="pop">Pop</option><option value="slide">Slide up</option><option value="type">Word reveal</option></select>
+<div class="hint">Preview styles are applied live. Burned-in captions require the final compositor/export pipeline.</div>
+</div>
+</div>
+</section>
 </section>
 <aside class="inspector">
 <div class="eyebrow">SHOT MONITOR</div><div class="monitor" id="monitor"><div class="monitor-art"><span>FORGE</span><b>MOTION</b><small>PREVIEW CANVAS</small></div></div>
@@ -66,4 +101,5 @@
 <footer class="footer"><span>FORGE MOTION · CREATIVE PRODUCTION</span><span id="saveStatus">SAVED LOCALLY</span><span>NO CLOUD JOBS RUNNING</span></footer>
 </div>
 <script src="motion.js"></script>
+<script src="post-production.js"></script>
 </body></html>
