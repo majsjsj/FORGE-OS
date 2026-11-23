@@ -218,7 +218,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -333,6 +333,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
@@ -395,7 +396,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -538,6 +539,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
@@ -600,7 +602,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -800,6 +802,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download selected R2 assets
         if: inputs.sync_assets == true
@@ -862,7 +865,7 @@ jobs:
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
       - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
+        uses: majsjsj/FORGE-OS/.github/actions/verify-forge-assets@main
         with:
           project_path: ${{ inputs.project_path }}
           project_branch: ${{ inputs.project_branch || github.ref_name }}
@@ -1016,6 +1019,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Download browser game build
         uses: actions/download-artifact@v4
