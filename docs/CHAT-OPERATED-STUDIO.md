@@ -10,7 +10,7 @@ Use Claude as the conversational interface while FORGE owns project structure, t
 - The remote MCP Worker provides authenticated, branch-aware project operations, short-lived terminal/cloud execution, build dispatch/status/logs, and artifact metadata/download links.
 - Project edits are isolated under `forge/projects/<name>`; direct writes to `main` are blocked. Branch comparison is available for review before a human merges changes.
 - GitHub Actions jobs are manually dispatched on temporary hosted runners for Web, Flutter, Godot 4.4.1, and Unity. Each engine has its own supported output and setup requirements documented in [on-demand environments](ON-DEMAND-ENVIRONMENTS.md).
-- R2 asset storage is optional. It keeps binary assets outside Git history, but build workflows do not yet synchronize those objects into project folders automatically.
+- R2 asset storage is optional. Selected objects can be explicitly staged into an isolated project branch with `forge_asset_import` or the atomic `forge_asset_import_batch` tool before a separately authorized build; automatic runner-to-R2 synchronization is not implemented.
 - A workflow definition, scaffold, or local adapter is not evidence of a successful cloud build or device test.
 
 ## Required architecture
@@ -25,7 +25,7 @@ Build jobs run in short-lived GitHub-hosted runners and check out the selected p
 
 ### 3. External assets
 
-Optional Cloudflare R2 storage keeps large binary assets out of Git history and Actions artifacts. Uploads are explicitly confirmed and scoped to an isolated project branch/path. Build-time synchronization is not implemented yet. Any future integration must authenticate the runner using GitHub OIDC, verify repository/workflow/ref/run claims server-side, scope access to the selected branch/project, issue short-lived read-only access, and avoid passing long-lived secrets or bearer URLs through workflow inputs and logs.
+Optional Cloudflare R2 storage keeps large binary assets out of Git history and Actions artifacts. Uploads are explicitly confirmed and scoped to an isolated project branch/path. GitHub Actions runners do not have direct access to the Worker’s R2 binding. The current safe path is explicit pre-build staging: list the project’s R2 objects, select only the needed assets, and import one file or a batch of up to 20 files / 40 MiB into the isolated project branch. Batch import validates paths and conflicts and commits the selected files together; it does not start a build. Automatic runner-to-R2 synchronization remains unimplemented. Any future direct runner integration must authenticate with GitHub OIDC, verify repository/workflow/ref/run claims server-side, scope access to the selected branch/project, issue short-lived read-only access, and avoid passing long-lived secrets or bearer URLs through workflow inputs and logs.
 
 ### 4. Tenant isolation and secret vault
 
