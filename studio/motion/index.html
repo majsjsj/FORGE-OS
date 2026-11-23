@@ -14,7 +14,7 @@
 <button class="nav active" data-panel="brief">01 <span>Creative brief</span></button>
 <button class="nav" data-panel="storyboard">02 <span>Storyboard</span></button>
 <button class="nav" data-panel="timeline">03 <span>Timeline</span></button>
-<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button>
+<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button><button class="nav" data-panel="graphics">06 <span>Motion graphics</span></button>
 <div class="rail-bottom"><div class="eyebrow">WORKSPACE STATUS</div><div class="status-line"><i></i> LOCAL PROJECT</div><p>Your project is saved in this browser. No cloud rendering or external AI service is invoked by this page.</p><a href="../index.html">← Back to FORGE Studio</a></div>
 </aside>
 <section class="content">
@@ -90,6 +90,32 @@
 </div>
 </div>
 </section>
+<section class="panel" id="panel-graphics">
+<div class="heading"><div><div class="eyebrow">ANIMATION & INFOGRAPHICS</div><h1>Motion graphics studio</h1><p>Compose animated titles, data lines, infographic paths and camera movement, then record a complete WebM sequence locally.</p></div><span class="tag">CANVAS RENDERER</span></div>
+<div class="grid-two">
+<div class="card">
+<div class="card-title">SCENE CONTENT</div>
+<label for="mgTitle">MAIN TITLE</label><input id="mgTitle" maxlength="90" value="THE FUTURE IS MOVING">
+<label for="mgSubtitle">SUBTITLE</label><input id="mgSubtitle" maxlength="140" value="Ideas transformed into impact">
+<label for="mgMetric">HIGHLIGHT METRIC</label><input id="mgMetric" maxlength="30" value="87%">
+<label for="mgLabel">METRIC LABEL</label><input id="mgLabel" maxlength="70" value="GROWTH THIS YEAR">
+<label for="mgData">INFOGRAPHIC VALUES · COMMA SEPARATED</label><input id="mgData" value="24,48,36,72,87,100">
+<label for="mgCopy">SUPPORTING TEXT</label><textarea id="mgCopy" rows="3">A clear story told through motion, data and design.</textarea>
+<label for="mgStyle">VISUAL TEMPLATE</label><select id="mgStyle"><option value="neon">Neon data</option><option value="minimal">Minimal editorial</option><option value="corporate">Corporate clean</option><option value="tech">Futuristic grid</option><option value="bold">Bold social</option></select>
+<label for="mgCamera">CAMERA MOVE</label><select id="mgCamera"><option value="push">Cinematic push-in</option><option value="pan">Horizontal pan</option><option value="pull">Pull back</option><option value="drift">Slow diagonal drift</option><option value="static">Locked frame</option></select>
+<label for="mgDuration">DURATION · SECONDS</label><input id="mgDuration" type="number" min="4" max="60" value="12">
+<label for="mgAccent">ACCENT COLOR</label><input id="mgAccent" type="color" value="#a994ff">
+<div class="row"><button id="mgPreview" class="primary">PREVIEW ANIMATION</button><button id="mgRecord" class="quiet">RENDER WEBM</button></div>
+<div class="hint" id="mgStatus">Preview runs in the browser. Rendering records the canvas animation to a WebM file; MP4 encoding and audio mixdown are not included in this browser-only renderer.</div>
+</div>
+<div class="card">
+<div class="card-title">LIVE COMPOSITION · 16:9</div>
+<div class="mg-stage"><canvas id="mgCanvas" width="1280" height="720" aria-label="Motion graphics preview"></canvas></div>
+<div class="mg-progress"><span id="mgTime">00:00 / 00:12</span><span id="mgRenderState">READY</span></div>
+<div class="hint">The exported clip includes the animated typography, infographic chart, connecting paths, particles and selected virtual camera movement.</div>
+</div>
+</div>
+</section>
 </section>
 <aside class="inspector">
 <div class="eyebrow">SHOT MONITOR</div><div class="monitor" id="monitor"><div class="monitor-art"><span>FORGE</span><b>MOTION</b><small>PREVIEW CANVAS</small></div></div>
@@ -102,4 +128,5 @@
 </div>
 <script src="motion.js"></script>
 <script src="post-production.js"></script>
+<script src="motion-graphics.js"></script>
 </body></html>
