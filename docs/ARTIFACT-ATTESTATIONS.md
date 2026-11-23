@@ -24,7 +24,11 @@ Signing the manifest binds its list of file hashes to the attestation. A consume
 gh attestation verify forge-artifact-manifest.json --repo majsjsj/FORGE-OS
 ```
 
-5. After the signature/provenance check succeeds, verify each file's size and SHA-256 against the `files` entries in the manifest. The manifest is an integrity index; it is not a malware scan.
+5. After the signature/provenance check succeeds, verify each file's size and SHA-256 against the `files` entries in the manifest using the repository verifier:
+
+   `python scripts/verify-forge-artifact.py --root /path/to/extracted-artifact`
+
+   Add `--engine flutter --output apk` (or the appropriate values) when you want to enforce the expected build type. The manifest is an integrity index; it is not a malware scan.
 
 ## Permissions and scope
 
