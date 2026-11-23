@@ -257,12 +257,12 @@ const TOOLS = [
   { name: "forge_cloud_logs", description: "Read the tail of logs for a job belonging to a cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, job_id: { type: "integer" } }, required: ["run_id", "job_id"], additionalProperties: false } },
   {
     name: "forge_asset_upload",
-    description: "Upload one binary asset (image, audio, font, model, archive, or game resource) to the optional Cloudflare R2 asset bucket, outside GitHub. Requires an existing forge/projects/ branch, a path inside the selected workspace project, base64 data, and confirm=true. Maximum decoded size is 16 MiB per upload. Returns a temporary signed download URL. Requires the owner to configure the FORGE_ASSETS_BUCKET R2 binding.",
+    description: "Upload one binary asset (image, audio, font, model, archive, or game resource) to the optional Cloudflare R2 asset bucket, outside GitHub. Requires an existing forge/projects/ branch, a path inside the selected workspace project, base64 data, and confirm=true. Maximum decoded size is 32 MiB per upload. Returns a temporary signed download URL. Requires the owner to configure the FORGE_ASSETS_BUCKET R2 binding.",
     inputSchema: { type: "object", properties: {
       branch: { type: "string" },
       project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
       asset_path: { type: "string", description: "Asset file path inside that project, for example assets/characters/hero.png." },
-      content_base64: { type: "string", description: "Base64-encoded binary file, up to 16 MiB decoded." },
+      content_base64: { type: "string", description: "Base64-encoded binary file, up to 32 MiB decoded." },
       content_type: { type: "string", description: "Optional MIME type, e.g. image/png or audio/ogg." },
       confirm: { type: "boolean" }
     }, required: ["branch","project_path","asset_path","content_base64","confirm"], additionalProperties: false }
@@ -842,9 +842,9 @@ async function callTool(name, args, env) {
     }
     if (name === "forge_asset_upload") {
       if (args.confirm !== true) throw new Error("Asset upload not performed: confirm=true is required after the user explicitly requests upload.");
-      if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 44739244) throw new Error("content_base64 must be a non-empty base64 string representing no more than 16 MiB.");
+      if (typeof args.content_base64 !== "string" || !args.content_base64.length || args.content_base64.length > 44739244) throw new Error("content_base64 must be a non-empty base64 string representing no more than 32 MiB.");
       const raw = atob(args.content_base64.replace(/\s/g, ""));
-      if (raw.length > 16 * 1024 * 1024) throw new Error("One asset upload is limited to 16 MiB decoded. Split or compress the asset before upload.");
+      if (raw.length > 32 * 1024 * 1024) throw new Error("One asset upload is limited to 32 MiB decoded. Split or compress the asset before upload.");
       const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
       const type = typeof args.content_type === "string" && args.content_type.length <= 128 ? args.content_type : "application/octet-stream";
       await bucket.put(key, bytes, { httpMetadata: { contentType: type }, customMetadata: { branch, project_path: project, asset_path: assetPath } });
