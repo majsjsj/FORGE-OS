@@ -1,5 +1,5 @@
 name: Verify FORGE staged assets
-description: Verify SHA-256 and path integrity for assets explicitly imported from R2
+description: Verify SHA-256 and path integrity for assets explicitly staged from R2 or the optional OIDC sync
 inputs:
   project_path:
     description: Repository-relative project directory
