@@ -450,7 +450,7 @@ async function callTool(name, args, env) {
       file.path = validateWorkspacePath(file.path);
       if (seen.has(file.path)) throw new Error("Duplicate path in batch: " + file.path);
       seen.add(file.path);
-      if (typeof file.content !== "string" || file.content.includes("\\0"))
+      if (typeof file.content !== "string" || file.content.includes("\0"))
         throw new Error("Each file must contain valid UTF-8 text without NUL bytes.");
       const size = new TextEncoder().encode(file.content).length;
       if (size > 500000) throw new Error("Each file must be no larger than 500 KB: " + file.path);
@@ -539,7 +539,7 @@ async function callTool(name, args, env) {
     if (branch === "main") throw new Error("Terminal execution requires an isolated forge/projects/ branch; main is not allowed.");
     const projectPath = validateWorkspacePath(args.project_path, true);
     if (projectPath === "workspace") throw new Error("Choose a project directory inside workspace/.");
-    if (typeof args.command !== "string" || !args.command.trim() || args.command.length > 4000 || args.command.includes("\\0"))
+    if (typeof args.command !== "string" || !args.command.trim() || args.command.length > 4000 || args.command.includes("\0"))
       throw new Error("command must be non-empty, contain no NUL bytes, and be no longer than 4000 characters.");
     await branchHead(env, branch);
     await github(env, `actions/workflows/${TERMINAL_WORKFLOW}/dispatches`, {
