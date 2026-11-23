@@ -256,6 +256,33 @@ const TOOLS = [
   { name: "forge_cloud_details", description: "Get status and job steps for one cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false } },
   { name: "forge_cloud_logs", description: "Read the tail of logs for a job belonging to a cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, job_id: { type: "integer" } }, required: ["run_id", "job_id"], additionalProperties: false } },
   {
+    name: "forge_asset_upload",
+    description: "Upload one binary asset (image, audio, font, model, archive, or game resource) to the optional Cloudflare R2 asset bucket, outside GitHub. Requires an existing forge/projects/ branch, a path inside the selected workspace project, base64 data, and confirm=true. Maximum decoded size is 16 MiB per upload. Returns a temporary signed download URL. Requires the owner to configure the FORGE_ASSETS_BUCKET R2 binding.",
+    inputSchema: { type: "object", properties: {
+      branch: { type: "string" },
+      project_path: { type: "string", description: "Project directory, for example workspace/my-game." },
+      asset_path: { type: "string", description: "Asset file path inside that project, for example assets/characters/hero.png." },
+      content_base64: { type: "string", description: "Base64-encoded binary file, up to 16 MiB decoded." },
+      content_type: { type: "string", description: "Optional MIME type, e.g. image/png or audio/ogg." },
+      confirm: { type: "boolean" }
+    }, required: ["branch","project_path","asset_path","content_base64","confirm"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_list",
+    description: "List assets stored outside GitHub for one project branch. Requires the optional Cloudflare R2 asset bucket. Read-only.",
+    inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" } }, required: ["branch","project_path"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_delete",
+    description: "Delete one externally stored project asset from Cloudflare R2. Requires confirm=true. This does not delete files from the GitHub project branch.",
+    inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" }, confirm: { type: "boolean" } }, required: ["branch","project_path","asset_path","confirm"], additionalProperties: false }
+  },
+  {
+    name: "forge_asset_download_url",
+    description: "Create a temporary signed URL to download one external project asset. URL expires after one hour. Requires the optional Cloudflare R2 asset bucket.",
+    inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" } }, required: ["branch","project_path","asset_path"], additionalProperties: false }
+  },
+  {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -662,6 +689,47 @@ async function callTool(name, args, env) {
     return { run_id: runId, job_id: jobId, truncated: logs.length > 20000, logs: logs.slice(-20000) };
   }
 
+  if (name === "forge_asset_upload" || name === "forge_asset_list" || name === "forge_asset_delete" || name === "forge_asset_download_url") {
+    const bucket = env.FORGE_ASSETS_BUCKET;
+    if (!bucket || typeof bucket.put !== "function") throw new Error("External asset storage is not configured. Create a Cloudflare R2 bucket and bind it to this Worker as FORGE_ASSETS_BUCKET; see docs/ASSET-STORAGE.md. No asset was changed.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main") throw new Error("External assets require an isolated forge/projects/ branch.");
+    const project = validateWorkspacePath(args.project_path, true);
+    if (project === "workspace") throw new Error("Choose a project directory inside workspace/.");
+    const assetPath = args.asset_path === undefined ? "" : args.asset_path;
+    if (assetPath && (typeof assetPath !== "string" || !/^[A-Za-z0-9._/-]+$/.test(assetPath) || assetPath.startsWith("/") || assetPath.includes("..") || assetPath.split("/").some(part => !part || part.startsWith("."))))
+      throw new Error("asset_path must be a safe relative path without hidden or traversal segments.");
+    const prefix = "projects/" + encodeURIComponent(branch) + "/" + project + "/";
+    if (name === "forge_asset_list") {
+      const listed = await bucket.list({ prefix, limit: 1000 });
+      return { branch, project_path: project, assets: (listed.objects || []).map(o => ({ asset_path: o.key.slice(prefix.length), size_bytes: o.size, uploaded: o.uploaded, etag: o.etag })), truncated: Boolean(listed.truncated), cursor: listed.truncated ? listed.cursor : null };
+    }
+    if (!assetPath) throw new Error("asset_path is required.");
+    const key = prefix + assetPath;
+    if (name === "forge_asset_delete") {
+      if (args.confirm !== true) throw new Error("Asset deletion not performed: confirm=true is required after the user explicitly requests deletion.");
+      await bucket.delete(key);
+      return { deleted: true, branch, project_path: project, asset_path: assetPath };
+    }
+    if (name === "forge_asset_upload") {
+      if (args.confirm !== true) throw new Error("Asset upload not performed: confirm=true is required after the user explicitly requests upload.");
+      if (typeof args.content_base64 !== "string" || !args.content_base64.length) throw new Error("content_base64 must be a non-empty base64 string.");
+      const raw = atob(args.content_base64.replace(/\s/g, ""));
+      if (raw.length > 16 * 1024 * 1024) throw new Error("One asset upload is limited to 16 MiB decoded. Split or compress the asset before upload.");
+      const bytes = Uint8Array.from(raw, c => c.charCodeAt(0));
+      const type = typeof args.content_type === "string" && args.content_type.length <= 128 ? args.content_type : "application/octet-stream";
+      await bucket.put(key, bytes, { httpMetadata: { contentType: type }, customMetadata: { branch, project_path: project, asset_path: assetPath } });
+    }
+    const expires = Math.floor(Date.now() / 1000) + 3600;
+    const secret = env.FORGE_ACCESS_TOKEN;
+    if (!secret) throw new Error("FORGE_ACCESS_TOKEN is not configured; cannot sign asset download URLs.");
+    const encoder = new TextEncoder();
+    const cryptoKey = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const signature = Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(key + "\\n" + expires)))).map(b => b.toString(16).padStart(2,"0")).join("");
+    const base = (env.ASSET_BASE_URL || new URL("https://"+(env.WORKER_HOST || "forge-os-remote-mcp.majsjsj.workers.dev")).origin).replace(/\/$/,"");
+    return { uploaded: name === "forge_asset_upload", branch, project_path: project, asset_path: assetPath, size_bytes: name === "forge_asset_upload" ? atob(args.content_base64.replace(/\s/g,"")).length : undefined, download_url: base + "/assets/" + key.split("/").map(encodeURIComponent).join("/") + "?expires=" + expires + "&sig=" + signature, expires_at: new Date(expires * 1000).toISOString(), note: "Asset bytes are stored in Cloudflare R2, not in Git history or GitHub Actions artifacts. Add the returned URL to the project configuration or download it during a build." };
+  }
+
   if (name === "forge_health") {
     return { ok: true, service: "FORGE Remote Controller", repository: REPO, workflow: WORKFLOW,
       github_token_configured: Boolean(env.GITHUB_TOKEN), build_execution: "on-demand only" };
@@ -762,6 +830,35 @@ async function callTool(name, args, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/assets/")) {
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
+      const bucket = env.FORGE_ASSETS_BUCKET;
+      if (!bucket || typeof bucket.get !== "function") return new Response("Asset storage is not configured.", { status: 503 });
+      let key;
+      try { key = url.pathname.slice("/assets/".length).split("/").map(decodeURIComponent).join("/"); }
+      catch { return new Response("Invalid asset path.", { status: 400 }); }
+      if (!key.startsWith("projects/") || key.includes("..") || key.split("/").some(part => !part || part.startsWith(".")))
+        return new Response("Invalid asset path.", { status: 400 });
+      const expires = Number(url.searchParams.get("expires")), sig = url.searchParams.get("sig") || "";
+      if (!Number.isSafeInteger(expires) || expires < Math.floor(Date.now()/1000) || expires > Math.floor(Date.now()/1000)+3600 || !/^[a-f0-9]{64}$/i.test(sig))
+        return new Response("Signed URL expired or invalid.", { status: 403 });
+      const secret = env.FORGE_ACCESS_TOKEN;
+      if (!secret) return new Response("Asset signing is not configured.", { status: 503 });
+      const encoder = new TextEncoder();
+      const cryptoKey = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const expected = Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(key + "\\n" + expires)))).map(b => b.toString(16).padStart(2,"0")).join("");
+      let mismatch = expected.length ^ sig.length;
+      for (let i=0;i<Math.min(expected.length,sig.length);i++) mismatch |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+      if (mismatch) return new Response("Signed URL invalid.", { status: 403 });
+      const object = await bucket.get(key);
+      if (!object) return new Response("Asset not found.", { status: 404 });
+      const headers = new Headers();
+      object.writeHttpMetadata(headers);
+      headers.set("etag", object.httpEtag);
+      headers.set("cache-control", "private, max-age=300");
+      headers.set("x-content-type-options", "nosniff");
+      return new Response(request.method === "HEAD" ? null : object.body, { headers });
+    }
     if (url.pathname.startsWith("/preview-version/")) {
       if (request.method !== "GET") return new Response("Method not allowed", { status: 405 });
       let projectDir;
@@ -836,8 +933,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.6.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.7.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
