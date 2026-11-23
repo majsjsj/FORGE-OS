@@ -1,0 +1,105 @@
+name: FORGE Cloud Execution Session
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_branch:
+        description: Isolated project branch to check out
+        required: true
+        type: string
+      project_path:
+        description: Project directory inside workspace/
+        required: true
+        type: string
+      command:
+        description: Setup, test, preview-server preparation, or project command (max 8000 chars)
+        required: true
+        type: string
+      save_changes:
+        description: Commit changes made by this session back to the same project branch
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forge-cloud-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  cloud-session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated project branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.project_branch }}
+          persist-credentials: false
+
+      - name: Validate project directory
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path.cwd().resolve()
+          raw = os.environ["PROJECT_PATH"]
+          p = Path(raw)
+          if p.is_absolute() or ".." in p.parts or not raw.startswith("workspace/"):
+              raise SystemExit("Unsafe project path: cloud sessions are restricted to workspace/<project>.")
+          resolved = (root / p).resolve()
+          if not resolved.is_relative_to(root) or not resolved.is_dir():
+              raise SystemExit("Project directory does not exist or resolves outside the checkout.")
+          print(f"Cloud workspace ready: {resolved.relative_to(root)}")
+          PY
+
+      - name: Execute in isolated cloud workspace
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          COMMAND: ${{ inputs.command }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$PROJECT_PATH"
+          printf 'FORGE Cloud Execution Session\nBranch: %s\nProject: %s\n' "$GITHUB_REF_NAME" "$PROJECT_PATH"
+          printf '\n$ %s\n\n' "$COMMAND"
+          timeout --signal=TERM --kill-after=10s 600s bash -lc "$COMMAND"
+
+      - name: Validate and save project changes
+        if: ${{ inputs.save_changes }}
+        env:
+          PROJECT_PATH: ${{ inputs.project_path }}
+          PROJECT_BRANCH: ${{ inputs.project_branch }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -A -- "$PROJECT_PATH"
+          FILE_COUNT="$(git diff --cached --name-only | wc -l | tr -d ' ')"
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "No project changes to save."
+            exit 0
+          fi
+          if [ "$FILE_COUNT" -gt 200 ]; then
+            echo "::error::Save stopped: more than 200 changed files. Split the work into smaller sessions."
+            exit 1
+          fi
+          TOTAL_BYTES="$(git diff --cached --numstat | awk '{ if ($1 != "-" && $2 != "-") total += ($1 + $2) * 200; } END { print total + 0 }')"
+          if [ "$TOTAL_BYTES" -gt 50000000 ]; then
+            echo "::error::Save stopped: estimated text diff exceeds 50 MB."
+            exit 1
+          fi
+          git config user.name "FORGE Cloud Session"
+          git config user.email "forge-cloud-session@users.noreply.github.com"
+          git commit -m "FORGE: save cloud session changes"
+          AUTH="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin "HEAD:$PROJECT_BRANCH"
+          echo "Saved $FILE_COUNT changed project files to $PROJECT_BRANCH."
+
+      - name: Report discarded changes when save is disabled
+        if: ${{ !inputs.save_changes }}
+        run: echo "Save disabled. All runner filesystem changes will be discarded when this session ends."
