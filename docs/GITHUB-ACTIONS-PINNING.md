@@ -26,7 +26,7 @@ Each SHA was resolved from the corresponding upstream repository's Git reference
 
 The repository-local asset verification action was already pinned to a full commit SHA.
 
-## Maintenance
+## CI enforcement\n\nThe test workflow runs `scripts/verify-actions-pinned.py` against both `.github/workflows/` and `.github/actions/`. It allows repository-local `./...` actions and requires every external action or reusable workflow reference to end in a full 40-character hexadecimal commit SHA. A regression to a movable tag or branch therefore fails CI.\n\n## Maintenance
 
 Dependabot remains configured to check GitHub Actions weekly. Review each update as a dependency change: verify the upstream release and commit, inspect breaking changes, and run the relevant workflow checks before merging. Do not automatically upgrade major versions just to refresh a pin.
 
