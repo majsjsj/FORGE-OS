@@ -199,6 +199,44 @@ async function branchHead(env, branch = "main") {
   return result.object.sha;
 }
 
+
+async function projectBackupPrefix(projectBranch) {
+  const branch = validateProjectBranch(projectBranch);
+  if (branch === "main") throw new Error("Backups require an isolated forge/projects/ branch.");
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(branch)));
+  const fingerprint = Array.from(digest).slice(0, 8).map(value => value.toString(16).padStart(2, "0")).join("");
+  return "forge/backups/" + fingerprint + "/";
+}
+
+function validateProjectBackupBranch(backupBranch, expectedPrefix) {
+  if (typeof backupBranch !== "string" || backupBranch.length > 120 ||
+      !/^forge\/backups\/[a-f0-9]{16}\/\d{13}-[a-f0-9]{8}$/.test(backupBranch) ||
+      !backupBranch.startsWith(expectedPrefix)) {
+    throw new Error("Backup branch does not belong to the selected project.");
+  }
+  return backupBranch;
+}
+
+async function listProjectBackups(env, projectBranch) {
+  const prefix = await projectBackupPrefix(projectBranch);
+  const refs = await github(env, "git/matching-refs/heads/" + prefix);
+  return (refs || []).filter(item => typeof item.ref === "string" && item.ref.startsWith("refs/heads/" + prefix))
+    .map(item => ({
+      backup_branch: item.ref.slice("refs/heads/".length),
+      commit_sha: item.object?.sha,
+      created_from_branch: projectBranch
+    })).sort((a, b) => b.backup_branch.localeCompare(a.backup_branch));
+}
+
+async function ensureBranchAbsent(env, branch) {
+  try {
+    await github(env, "git/ref/heads/" + branch);
+    throw new Error("Branch already exists: " + branch);
+  } catch (error) {
+    if (!String(error?.message || error).includes("GitHub API 404")) throw error;
+  }
+}
+
 function decodeBase64Utf8(value) {
   const binary = atob(value.replace(/\n/g, ""));
   const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
@@ -274,6 +312,44 @@ const TOOLS = [
     name: "forge_project_branch_list",
     description: "List existing isolated project branches under forge/projects/. Read-only.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    name: "forge_project_backup_create",
+    description: "Create a point-in-time backup of one isolated project branch by creating a forge/backups ref at its current commit. Keeps up to 25 backups per project; no build, artifact upload, or external storage is used. Requires confirm=true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Existing forge/projects/ branch to snapshot." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "confirm"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_backup_list",
+    description: "List point-in-time backup refs for one isolated project branch, including their commit SHAs. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: { branch: { type: "string", description: "Existing forge/projects/ branch whose backups should be listed." } },
+      required: ["branch"],
+      additionalProperties: false
+    }
+  },
+  {
+    name: "forge_project_backup_restore",
+    description: "Restore a selected project backup into a NEW isolated forge/projects/ branch. Never overwrites or rewinds the original branch. Requires confirm=true.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Original project branch that owns the backup." },
+        backup_branch: { type: "string", description: "Exact backup_branch returned by forge_project_backup_list." },
+        new_branch: { type: "string", description: "New, unused forge/projects/ branch to create from the backup commit." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "backup_branch", "new_branch", "confirm"],
+      additionalProperties: false
+    }
   },
   {
     name: "forge_workspace_list",
@@ -658,6 +734,61 @@ async function callTool(name, args, env) {
     return (data || []).filter(item => item.name.startsWith("forge/projects/"))
       .map(item => ({ branch: item.name, commit_sha: item.commit.sha, protected: item.protected }));
   }
+  if (name === "forge_project_backup_create") {
+    if (args.confirm !== true) throw new Error("Backup not created: confirm=true is required after the user explicitly asks for a project snapshot.");
+    const projectBranch = validateProjectBranch(args.branch);
+    if (projectBranch === "main") throw new Error("Project backups require an isolated forge/projects/ branch.");
+    const currentSha = await branchHead(env, projectBranch);
+    const prefix = await projectBackupPrefix(projectBranch);
+    const refs = await github(env, "git/matching-refs/heads/" + prefix);
+    const existing = (refs || []).filter(item => typeof item.ref === "string" && item.ref.startsWith("refs/heads/" + prefix));
+    if (existing.length >= 25) throw new Error("This project already has 25 backups. Review old snapshots before creating another.");
+    const backupBranch = prefix + Date.now() + "-" + currentSha.slice(0, 8);
+    await ensureBranchAbsent(env, backupBranch);
+    const created = await github(env, "git/refs", {
+      method: "POST",
+      body: JSON.stringify({ ref: "refs/heads/" + backupBranch, sha: currentSha })
+    });
+    return {
+      created: true, project_branch: projectBranch, backup_branch: backupBranch,
+      commit_sha: created.object.sha, backups_kept: existing.length + 1,
+      note: "Point-in-time Git ref created. No files were copied, no build was run, and the original project branch was not changed."
+    };
+  }
+
+  if (name === "forge_project_backup_list") {
+    const projectBranch = validateProjectBranch(args.branch);
+    if (projectBranch === "main") throw new Error("Choose an isolated forge/projects/ branch.");
+    await branchHead(env, projectBranch);
+    const backups = await listProjectBackups(env, projectBranch);
+    return { project_branch: projectBranch, count: backups.length, max_backups: 25, backups };
+  }
+
+  if (name === "forge_project_backup_restore") {
+    if (args.confirm !== true) throw new Error("Restore not performed: confirm=true is required after the user explicitly chooses a backup and new branch.");
+    const projectBranch = validateProjectBranch(args.branch);
+    if (projectBranch === "main") throw new Error("Restore requires an isolated project branch.");
+    const prefix = await projectBackupPrefix(projectBranch);
+    const backupBranch = validateProjectBackupBranch(args.backup_branch, prefix);
+    const newBranch = validateProjectBranch(args.new_branch);
+    if (newBranch === "main" || newBranch === projectBranch)
+      throw new Error("Restore must create a different isolated forge/projects/ branch; the original is never overwritten.");
+    const backupRef = await github(env, "git/ref/heads/" + backupBranch);
+    const backupSha = backupRef.object?.sha;
+    if (typeof backupSha !== "string" || !/^[a-f0-9]{40}$/i.test(backupSha))
+      throw new Error("Selected backup ref does not contain a valid commit SHA.");
+    await ensureBranchAbsent(env, newBranch);
+    const created = await github(env, "git/refs", {
+      method: "POST",
+      body: JSON.stringify({ ref: "refs/heads/" + newBranch, sha: backupSha })
+    });
+    return {
+      restored: true, source_branch: projectBranch, backup_branch: backupBranch,
+      restored_commit_sha: backupSha, new_branch: newBranch, created_commit_sha: created.object.sha,
+      note: "A new isolated branch was created from the selected backup. The original project branch and all existing commits remain unchanged."
+    };
+  }
+
   if (name === "forge_workspace_list") {
     const path = validateWorkspacePath(args.path, true);
     const branch = validateProjectBranch(args.branch || "main");
@@ -1518,8 +1649,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.8.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured; use forge_asset_import or forge_asset_import_batch to explicitly stage selected R2 files into the project branch before a separately authorized build. R2 assets are not fetched automatically by GitHub build runners. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.9.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects; create point-in-time snapshots with forge_project_backup_create, inspect them with forge_project_backup_list, and restore into a new isolated branch with forge_project_backup_restore (never overwrites the source branch); read forge_project_context_read at the start of a continuing project task and update forge_project_context_save with confirmed architecture, decisions, constraints, and TODOs (never credentials); run forge_project_inspect followed by forge_project_preflight for a read-only structural release check before any explicitly authorized engine test/build; preflight does not execute code or consume Actions quota; use forge_asset_upload/list/delete/download_url for optional Cloudflare R2 assets only when FORGE_ASSETS_BUCKET is configured; use forge_asset_import or forge_asset_import_batch to explicitly stage selected R2 files into the project branch before a separately authorized build. R2 assets are not fetched automatically by GitHub build runners. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
