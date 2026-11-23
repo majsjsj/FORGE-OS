@@ -72,3 +72,8 @@ The MCP tool `forge_project_preflight` runs a bounded structural check against c
 ## Saving generated Studio artifacts to cloud projects
 
 The MCP tool `forge_studio_artifact_save` commits Design Studio output, Game Lab level JSON, or a bounded set of generated project text files into an existing `forge/projects/*` branch. Every file path is constrained to remain below the selected `project_path`; writes to `main` are rejected. The operation requires explicit `confirm=true`, and existing files require their current SHA from `forge_workspace_read` to prevent stale overwrites. It delegates to the existing atomic batch writer and does not execute code, run tests, dispatch builds, or upload binary assets. After saving, use project inspection/preflight and the branch-aware preview tools as appropriate.
+
+
+## Persistent per-project context
+
+The MCP tools `forge_project_context_read` and `forge_project_context_save` provide a small Markdown memory file at `workspace/<project>/FORGE_CONTEXT.md` on the isolated project branch. Agents should read it before continuing work and update it with confirmed architecture, user decisions, constraints, setup notes, and TODOs. Saves require explicit confirmation and the current file SHA for updates; the file is limited to 256 KiB and credential-like values/private keys are rejected. Do not store passwords, tokens, private keys, or other secrets in project context. This is repository-backed project documentation, not private model memory.
