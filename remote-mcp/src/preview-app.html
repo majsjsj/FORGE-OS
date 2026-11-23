@@ -30,7 +30,7 @@ iframe{display:block;width:100%;height:100%;border:0;background:white}.empty{hei
    const safeSource=source.replace(/<base\b[^>]*>/gi,"").replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy["']?[^>]*>/gi,"");
    const injection='<meta http-equiv="Content-Security-Policy" content="'+escapeAttr(policy)+'"><base href="'+escapeAttr(base)+'">';
    const rendered=/<head\b[^>]*>/i.test(safeSource)?safeSource.replace(/<head\b[^>]*>/i,match=>match+injection):injection+safeSource;
-   const frame=document.createElement("iframe");frame.setAttribute("title","Interactive project preview");frame.setAttribute("sandbox","allow-scripts");frame.setAttribute("referrerpolicy","no-referrer");frame.srcdoc=rendered;stage.replaceChildren(frame);
+   const frame=document.createElement("iframe");frame.setAttribute("title","Interactive project preview");frame.setAttribute("sandbox","allow-scripts allow-pointer-lock");frame.allowFullscreen=true;frame.setAttribute("referrerpolicy","no-referrer");frame.srcdoc=rendered;stage.replaceChildren(frame);
    say("Preview loaded · "+(current.branch||"project branch")+(force?" · refreshed":""));
   }catch(error){say("Preview unavailable: "+String(error&&error.message||error))}
   finally{loading=false;refreshButton.disabled=false}
