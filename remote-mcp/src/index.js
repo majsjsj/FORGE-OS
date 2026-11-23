@@ -361,11 +361,17 @@ function validateProjectPlanDocument(plan) {
     throw new Error("Invalid project plan document: expected schema_version 1, a supported project_type, agents, and 1-50 tasks.");
   }
   const ids = new Set();
+  const agentIds = new Set();
+  for (const agent of plan.agents) {
+    if (!agent || typeof agent.id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(agent.id) || agentIds.has(agent.id))
+      throw new Error("Invalid project plan agent or duplicate agent ID.");
+    agentIds.add(agent.id);
+  }
   for (const task of plan.tasks) {
     if (!task || typeof task.id !== "string" || !/^[A-Za-z0-9_-]{1,24}$/.test(task.id) ||
         ids.has(task.id) || typeof task.title !== "string" || !task.title.trim() ||
-        !Array.isArray(task.depends_on)) {
-      throw new Error("Invalid project plan task or duplicate task ID.");
+        !Array.isArray(task.depends_on) || (task.agent !== undefined && !agentIds.has(task.agent))) {
+      throw new Error("Invalid project plan task, agent assignment, or duplicate task ID.");
     }
     ids.add(task.id);
   }
@@ -375,6 +381,17 @@ function validateProjectPlanDocument(plan) {
     if (task.status !== undefined && !["pending", "in_progress", "blocked", "completed"].includes(task.status))
       throw new Error("Project plan contains an invalid task status: " + task.id);
   }
+  const taskById = new Map(plan.tasks.map(task => [task.id, task]));
+  const visiting = new Set(), visited = new Set();
+  const visit = id => {
+    if (visiting.has(id)) throw new Error("Project plan task dependencies contain a cycle.");
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of taskById.get(id).depends_on) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of ids) visit(id);
   const serialized = JSON.stringify(plan);
   if (new TextEncoder().encode(serialized).length > 256 * 1024)
     throw new Error("Project plan must not exceed 256 KiB.");
