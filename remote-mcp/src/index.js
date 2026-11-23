@@ -119,7 +119,7 @@ async function handleActionsAssetSync(request, env) {
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
       const sha256 = Array.from(digest).map(value => value.toString(16).padStart(2, "0")).join("");
       const signature = Array.from(new Uint8Array(await crypto.subtle.sign("HMAC", signingKey,
-        encoder.encode(key + "\\\\n" + expires)))).map(value => value.toString(16).padStart(2, "0")).join("");
+        encoder.encode(key + "\\n" + expires)))).map(value => value.toString(16).padStart(2, "0")).join("");
       const url = base + "/assets/" + key.split("/").map(encodeURIComponent).join("/") +
         "?expires=" + expires + "&sig=" + signature;
       assets.push({ path, size_bytes: object.size, sha256,
