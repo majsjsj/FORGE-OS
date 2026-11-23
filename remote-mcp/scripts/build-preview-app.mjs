@@ -10,4 +10,4 @@ await writeFile(new URL("../src/preview-app-bundle.js", import.meta.url),
 
 const html = await readFile(new URL("../src/preview-app.html", import.meta.url), "utf8");
 await writeFile(new URL("../src/preview-app-template.js", import.meta.url),
-  "export default " + JSON.stringify(html) + ";\\n", "utf8");
+  "export default " + JSON.stringify(html) + ";\n", "utf8");
