@@ -570,10 +570,12 @@ export default {
       let projectDir;
       try { projectDir = decodeURIComponent(url.pathname.slice("/preview-version/".length)); }
       catch { return new Response("Invalid preview path", { status: 400 }); }
+      let branch;
       try {
         validateWorkspacePath(projectDir, true);
-        const commits = await github(env, "commits?path=" + encodeURIComponent(projectDir) + "&per_page=1");
-        return new Response(JSON.stringify({ version: commits[0]?.sha || null }), {
+        branch = validateProjectBranch(url.searchParams.get("ref") || "main");
+        const commits = await github(env, "commits?path=" + encodeURIComponent(projectDir) + "&sha=" + encodeURIComponent(branch) + "&per_page=1");
+        return new Response(JSON.stringify({ version: commits[0]?.sha || null, branch }), {
           headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store",
             "access-control-allow-origin": "*", "x-content-type-options": "nosniff" }
         });
@@ -586,12 +588,15 @@ export default {
     }
     if (url.pathname.startsWith("/preview/")) {
       if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
-      let projectFile;
-      try { projectFile = decodeURIComponent(url.pathname.slice("/preview/".length)); }
-      catch { return new Response("Invalid preview path", { status: 400 }); }
+      let projectFile, branch;
+      try {
+        projectFile = decodeURIComponent(url.pathname.slice("/preview/".length));
+        branch = validateProjectBranch(url.searchParams.get("ref") || "main");
+      } catch { return new Response("Invalid preview path or branch", { status: 400 }); }
       if (!/^workspace\/[A-Za-z0-9._/-]+$/.test(projectFile) || projectFile.includes("..") ||
           projectFile.split("/").some(part => !part || part.startsWith("."))) return new Response("Invalid preview path", { status: 400 });
-      const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/main/" + projectFile);
+      const rawBranch = branch.split("/").map(encodeURIComponent).join("/");
+      const upstream = await fetch("https://raw.githubusercontent.com/" + REPO + "/" + rawBranch + "/" + projectFile.split("/").map(encodeURIComponent).join("/"));
       if (!upstream.ok) return new Response(upstream.status === 404 ? "Preview file not found in the public main branch." : "Preview source unavailable.", { status: upstream.status });
       const ext = projectFile.toLowerCase().split(".").pop();
       const types = { html:"text/html; charset=utf-8", htm:"text/html; charset=utf-8", js:"application/javascript; charset=utf-8",
