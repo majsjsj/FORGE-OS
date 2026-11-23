@@ -230,3 +230,29 @@ test("project plan storage rejects main branch and invalid dependency graphs", a
   assert.match(credential.payload.result.content[0].text, /credential values/);
   assert.equal(credential.requests, 0);
 });
+
+
+test("task monitor reports ready, blocked, active, and completed tasks without writes", async () => {
+  const currentPlan = samplePlan();
+  currentPlan.tasks[0].status = "completed";
+  currentPlan.tasks[1].status = "pending";
+  currentPlan.tasks.push(
+    { id: "P3", title: "Prepare release", depends_on: ["P2"], status: "pending" },
+    { id: "P4", title: "Investigate blocker", depends_on: [], status: "blocked" }
+  );
+  const result = await callTool("forge_project_task_monitor", {
+    project_path: projectPath, branch
+  }, async (input, options = {}) => {
+    assert.equal(options.method || "GET", "GET");
+    return apiResponse({ path: planPath, sha: fileSha, encoding: "base64", content: encodeBase64(JSON.stringify(currentPlan)) });
+  });
+  assert.equal(result.payload.result.isError, false);
+  assert.deepEqual(result.value.counts, {
+    total: 4, completed: 1, in_progress: 0, ready: 1, blocked: 2
+  });
+  assert.deepEqual(result.value.ready_tasks.map(task => task.id), ["P2"]);
+  assert.deepEqual(result.value.blocked_tasks.map(task => task.id), ["P3", "P4"]);
+  assert.equal(result.value.storage.sha, fileSha);
+  assert.match(result.value.note, /Read-only checkpoint/);
+  assert.equal(result.requests, 1);
+});
