@@ -592,7 +592,7 @@ async function callTool(name, args, env) {
     const entry = validateWorkspacePath(args.entry_file);
     const branch = validateProjectBranch(args.branch || "main");
     if (!entry.toLowerCase().endsWith(".html")) throw new Error("entry_file must point to a committed .html file inside workspace/.");
-    const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\/$/, "");
+    const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.majsjsj.workers.dev").replace(/\/$/, "");
     const projectDir = entry.slice(0, entry.lastIndexOf("/"));
     return { entry_file: entry, branch, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
       version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
