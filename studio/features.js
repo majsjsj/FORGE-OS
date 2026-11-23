@@ -18,8 +18,58 @@ $("forgePerf").onclick=()=>{const f=currentFiles(),bytes=new Blob([f.html,f.css,
 function gameStudio(b){b.innerHTML=`<p class="feature-lead">مساحة تنظيم ألعاب Godot وUnity ومشاريع ألعاب المتصفح. لا يتم تنزيل أي محرك أو مكتبة تلقائيًا.</p><div class="feature-grid"><label>المحرك<select id="gameEngine"><option>Godot 2D</option><option>Godot 3D</option><option>Unity 2D</option><option>Unity 3D</option><option>Browser Game</option></select></label><label>نوع المشروع<select id="gameGenre"><option>Platformer</option><option>Arcade</option><option>Racing</option><option>Puzzle</option><option>Adventure</option><option>Original concept</option></select></label></div><label>وصف فكرة اللعبة<textarea id="gameIdea" placeholder="صف طريقة اللعب والعالم والشخصيات..."></textarea></label><button class="feature-btn" id="gamePlan">إنشاء موجز تصميم اللعبة</button><div id="gamePlanOut" class="feature-report">سيتم إنشاء موجز تصميم قابل للنسخ، وليس مشروعًا تنفيذيًا تلقائيًا.</div><button class="feature-btn secondary" id="openScene">فتح مصمم المشاهد</button>`;
 $("gamePlan").onclick=()=>{const plan={engine:$("gameEngine").value,genre:$("gameGenre").value,idea:$("gameIdea").value.trim(),created:new Date().toISOString()};write("game-plan",plan);$("gamePlanOut").textContent=JSON.stringify(plan,null,2)};
 $("openScene").onclick=()=>openPanel("scene")}
-function assetLibrary(b){const assets=read("assets",[]);b.innerHTML=`<p class="feature-lead">مكتبة أصول محلية في متصفحك. الملفات لا تُرفع إلى GitHub ولا تستهلك مساحة المستودع.</p><label class="feature-upload">إضافة صور / صوت / ملفات ثلاثية الأبعاد<input id="assetFiles" type="file" multiple accept="image/*,audio/*,.glb,.gltf,.obj,.mtl,.fbx,.wav,.mp3,.ogg"></label><div id="assetList" class="feature-report">${assets.length?assets.map(a=>`<div class="asset-row"><span>${escapeHTML(a.name)}</span><small>${(a.size/1024).toFixed(1)} KB · ${escapeHTML(a.type||"file")}</small></div>`).join(""):"لا توجد أصول محفوظة بعد."}</div><p class="feature-note">نسخة MVP تحفظ أسماء الملفات وبياناتها فقط؛ استخدم المشروع السحابي أو Git LFS للأصول الفعلية عند الحاجة، بعد إعداد التخزين.</p>`;
-$("assetFiles").onchange=e=>{const list=read("assets",[]);for(const f of e.target.files)list.push({name:f.name,size:f.size,type:f.type||f.name.split(".").pop(),added:new Date().toISOString()});write("assets",list.slice(-200));assetLibrary(b)}}
+let assetDatabasePromise=null;
+function openAssetDatabase(){
+ if(!window.indexedDB)return Promise.reject(new Error("هذا المتصفح لا يدعم IndexedDB."));
+ if(assetDatabasePromise)return assetDatabasePromise;
+ assetDatabasePromise=new Promise((resolve,reject)=>{
+  const request=indexedDB.open("forge-local-assets",1);
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains("assets"))db.createObjectStore("assets",{keyPath:"id"})};
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error("تعذر فتح مكتبة الأصول."));
+  request.onblocked=()=>reject(new Error("قاعدة بيانات الأصول مشغولة في تبويب آخر. أغلق تبويبات FORGE الأخرى وحاول مجددًا."));
+ });
+ return assetDatabasePromise;
+}
+async function assetDBRequest(mode,method,value){
+ const db=await openAssetDatabase();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("assets",mode),store=tx.objectStore("assets");
+  let request;
+  try{request=value===undefined?store[method]():store[method](value)}catch(error){reject(error);return}
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error("تعذر تنفيذ عملية مكتبة الأصول."));
+  tx.onabort=()=>reject(tx.error||new Error("تم إلغاء حفظ الملف. قد تكون مساحة المتصفح غير كافية."));
+ });
+}
+function assetLibrary(b){
+ b.innerHTML=`<p class="feature-lead">مكتبة أصول محلية حقيقية: تحفظ الملفات نفسها (صور، صوت، فيديو، وملفات 3D) داخل IndexedDB في هذا المتصفح، وليس مجرد أسمائها. لا يتم رفعها إلى GitHub أو أي خادم.</p><label class="feature-upload">إضافة ملفات أصول<input id="assetFiles" type="file" multiple accept="image/*,audio/*,video/*,.glb,.gltf,.obj,.mtl,.fbx,.wav,.mp3,.ogg,.zip"></label><div id="assetStatus" class="feature-note">جاري فتح التخزين المحلي...</div><div id="assetList" class="feature-report">تحميل الملفات...</div><div id="assetPreview" class="feature-report" hidden></div><p class="feature-note">الملفات تبقى على هذا المتصفح والجهاز فقط. مساحة التخزين يحددها المتصفح؛ حذف بيانات الموقع أو استخدام وضع التصفح الخاص قد يؤدي إلى فقدها. هذه المكتبة لا تزامن الأصول إلى R2 أو إلى مشاريع GitHub تلقائيًا.</p>`;
+ const list=$("assetList"),status=$("assetStatus"),preview=$("assetPreview"),picker=$("assetFiles");
+ async function refresh(){
+  try{
+   const files=await assetDBRequest("readonly","getAll");
+   state.assets=files.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+   list.innerHTML=state.assets.length?state.assets.map(a=>`<div class="asset-row"><span><b>${escapeHTML(a.name)}</b><br><small>${(a.size/1048576).toFixed(2)} MB · ${escapeHTML(a.type||"نوع غير محدد")}</small></span><span class="asset-actions"><button class="feature-btn secondary" data-asset-download="${escapeHTML(a.id)}">تنزيل</button><button class="feature-btn secondary" data-asset-preview="${escapeHTML(a.id)}">معاينة</button><button class="feature-btn secondary" data-asset-delete="${escapeHTML(a.id)}">حذف</button></span></div>`).join(""):"لا توجد ملفات محفوظة بعد.";
+   status.textContent="عدد الملفات: "+files.length+" · التخزين محلي في IndexedDB.";
+   list.querySelectorAll("[data-asset-download]").forEach(button=>button.onclick=async()=>{try{const a=await assetDBRequest("readonly","get",button.dataset.assetDownload);if(!a)return;const url=URL.createObjectURL(a.blob),link=document.createElement("a");link.href=url;link.download=a.name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(error){status.textContent="فشل التنزيل: "+error.message}});
+   list.querySelectorAll("[data-asset-preview]").forEach(button=>button.onclick=async()=>{try{const a=await assetDBRequest("readonly","get",button.dataset.assetPreview);if(!a)return;preview.replaceChildren();preview.hidden=false;const heading=document.createElement("b");heading.textContent=a.name;preview.append(heading);if(a.type.startsWith("image/")||a.type.startsWith("audio/")||a.type.startsWith("video/")){const media=document.createElement(a.type.startsWith("image/")?"img":a.type.startsWith("audio/")?"audio":"video");media.src=URL.createObjectURL(a.blob);media.controls=a.type.startsWith("audio/")||a.type.startsWith("video/");media.style.maxWidth="100%";media.style.maxHeight="320px";preview.append(media);setTimeout(()=>URL.revokeObjectURL(media.src),300000)}else{const note=document.createElement("p");note.textContent="لا تتوفر معاينة مدمجة لهذا النوع؛ استخدم زر التنزيل.";preview.append(note)}}catch(error){status.textContent="تعذرت المعاينة: "+error.message}});
+   list.querySelectorAll("[data-asset-delete]").forEach(button=>button.onclick=async()=>{const a=state.assets.find(x=>x.id===button.dataset.assetDelete);if(!a||!window.confirm("حذف الملف المحلي؟ "+a.name))return;try{await assetDBRequest("readwrite","delete",a.id);if(!preview.hidden)preview.replaceChildren();await refresh()}catch(error){status.textContent="فشل الحذف: "+error.message}});
+  }catch(error){list.textContent="تعذر فتح مكتبة الأصول: "+error.message;status.textContent="تأكد من السماح بالتخزين المحلي في المتصفح."}
+ }
+ picker.onchange=async event=>{
+  const selected=Array.from(event.target.files||[]);if(!selected.length)return;
+  let saved=0,failed=[];
+  status.textContent="جاري حفظ "+selected.length+" ملف/ملفات في التخزين المحلي...";
+  for(const file of selected){
+   try{await assetDBRequest("readwrite","put",{id:crypto.randomUUID?crypto.randomUUID():"asset-"+Date.now()+"-"+Math.random().toString(16).slice(2),name:file.name,type:file.type||"",size:file.size,lastModified:file.lastModified,createdAt:Date.now(),blob:file});saved++}
+   catch(error){failed.push(file.name+": "+(error&&error.name==="QuotaExceededError"?"مساحة المتصفح غير كافية":error.message));}
+  }
+  picker.value="";
+  status.textContent="تم حفظ "+saved+" ملف/ملفات."+(failed.length?" تعذر حفظ: "+failed.join("؛ "):"");
+  await refresh();
+ };
+ refresh();
+}
 function sceneDesigner(b){state.scene=read("scene",[]);b.innerHTML=`<p class="feature-lead">مصمم مشهد ثنائي الأبعاد خفيف للتخطيط الأولي. احفظ المشهد كـ JSON ثم اطلب من المساعد تحويله إلى ملفات Godot أو Unity.</p><div class="feature-toolbar"><button class="feature-btn" data-add="rect">+ مستطيل</button><button class="feature-btn" data-add="circle">+ دائرة</button><button class="feature-btn secondary" id="sceneClear">مسح</button><button class="feature-btn secondary" id="sceneSave">حفظ JSON</button></div><canvas id="sceneCanvas" width="720" height="420" class="scene-canvas"></canvas><div id="sceneObjects" class="feature-report"></div><p class="feature-note">هذا محرر تخطيط 2D أولي وليس بديلًا عن Godot Editor أو Unity Editor.</p>`;
 const canvas=$("sceneCanvas"),ctx=canvas.getContext("2d");const draw=()=>{ctx.fillStyle="#101722";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle="#263548";for(let x=0;x<canvas.width;x+=30){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke()}for(let y=0;y<canvas.height;y+=30){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke()}state.scene.forEach((o,i)=>{ctx.fillStyle=o.color;if(o.type==="circle"){ctx.beginPath();ctx.arc(o.x,o.y,Math.max(8,o.w/2),0,Math.PI*2);ctx.fill()}else ctx.fillRect(o.x-o.w/2,o.y-o.h/2,o.w,o.h);ctx.fillStyle="#fff";ctx.font="12px sans-serif";ctx.fillText(o.name,o.x+12,o.y-12)});$("sceneObjects").textContent=state.scene.map(o=>o.name+" · "+o.type+" · "+o.x+","+o.y).join("\n")||"المشهد فارغ."};b.querySelectorAll("[data-add]").forEach(btn=>btn.onclick=()=>{const n=state.scene.length+1;state.scene.push({name:(btn.dataset.add==="circle"?"Circle ":"Object ")+n,type:btn.dataset.add,x:100+(n*53)%520,y:90+(n*37)%260,w:btn.dataset.add==="circle"?52:90,h:btn.dataset.add==="circle"?52:60,color:["#71e3d7","#f0b36d","#8caeff","#d18bff"][n%4]});write("scene",state.scene);draw()});$("sceneClear").onclick=()=>{state.scene=[];write("scene",[]);draw()};$("sceneSave").onclick=()=>{const blob=new Blob([JSON.stringify({format:"forge-scene-v1",engine:"engine-neutral-2d",objects:state.scene},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="forge-scene.json";a.click();URL.revokeObjectURL(a.href)};draw()}
 async function gitManager(b){b.innerHTML='<p class="feature-lead">قراءة سجل GitHub العام للمستودع. عمليات Commit وPush تتم عبر GitHub.dev أو أدوات FORGE المصرح بها.</p><div class="feature-report" id="gitHistory">جارٍ تحميل آخر التغييرات...</div><a class="feature-link" href="https://github.dev/majsjsj/FORGE-OS" target="_blank" rel="noopener">فتح GitHub.dev للتعديل والـ Commit ↗</a>';try{const commits=await github("/commits?per_page=12");$("gitHistory").innerHTML=commits.map(c=>`<div class="asset-row"><span><b>${escapeHTML(c.commit.message.split("\n")[0])}</b><br><small>${escapeHTML(c.commit.author.name)} · ${new Date(c.commit.author.date).toLocaleString()}</small></span><a target="_blank" rel="noopener" href="${c.html_url}">${c.sha.slice(0,7)}</a></div>`).join("")}catch(e){$("gitHistory").textContent=e.message}}
