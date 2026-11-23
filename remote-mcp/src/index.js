@@ -1392,7 +1392,7 @@ async function callTool(name, args, env) {
       if (!artifact) continue;
       return { found: true, engine: artifact.name.startsWith("forge-godot") ? "Godot" : "Unity",
         run_id: run.id, run_url: run.html_url, artifact_name: artifact.name,
-        preview_url: "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/index.html?run_id=" + run.id,
+        preview_url: "https://forge-os-remote-mcp.majsjsj.workers.dev/game-preview/" + run.id + "/index.html",
         note: "This URL serves the latest successful Web build that completed the preview-site deployment. It is interactive in a browser; Android APK/AAB files are not browser previews." };
     }
     return { found: false, message: "No successful Godot or Unity Web build with a completed Pages deployment was found yet. Request an authorized Web build first." };
@@ -1847,7 +1847,10 @@ async function handleGamePreview(request, url) {
   let path;
   try {
     path = decodeURIComponent(url.pathname.slice("/game-preview/".length));
-    if (!path) path = "index.html";
+    const segments = path.split("/");
+    const buildId = segments.shift();
+    if (!/^\\d{1,20}$/.test(buildId || "")) throw new Error("A valid deployed build ID is required.");
+    path = segments.join("/") || "index.html";
     if (path.length > 500 || !/^[A-Za-z0-9._/-]+$/.test(path) || path.includes("\\\\") ||
         path.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")))
       throw new Error("Unsafe game preview path.");
@@ -1865,7 +1868,7 @@ async function handleGamePreview(request, url) {
     return new Response("Game preview upstream is unavailable.", { status: 502 });
   }
   const headers = new Headers(upstream.headers);
-  headers.set("cache-control", "no-store");
+  headers.set("cache-control", "public, max-age=31536000, immutable");
   headers.set("access-control-allow-origin", "*");
   headers.set("cross-origin-resource-policy", "cross-origin");
   headers.set("x-content-type-options", "nosniff");
