@@ -25,4 +25,4 @@ Objects are namespaced by isolated project branch and project path. They are not
 
 External storage is now available as an optional independent asset store, but the build workflows do not yet automatically synchronize R2 assets into a project before compiling. For a build that needs an asset, download it into the project workspace first and commit it to the project branch, or use a future build-sync integration. Do not assume a successful upload alone makes an asset available inside an APK/AAB/Web build.
 
-The current upload API accepts up to 16 MiB per file per call. It does not yet implement resumable multipart uploads, automatic deduplication, lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
+The current upload API accepts up to 32 MiB per file per call. It does not yet implement resumable multipart uploads, automatic deduplication, lifecycle cleanup, per-user quotas, or multi-tenant isolation. The Worker remains a single-owner service. Monitor R2 usage in Cloudflare and delete unused objects deliberately.
