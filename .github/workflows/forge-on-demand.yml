@@ -149,7 +149,7 @@ jobs:
 
   web:
     needs: [sync-assets]
-    if: always() && inputs.engine == 'web' && (needs.sync-assets.result == 'success' || needs.sync-assets.result == 'skipped')
+    if: always() && inputs.engine == 'web' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -327,7 +327,7 @@ jobs:
 
   flutter:
     needs: [sync-assets]
-    if: always() && inputs.engine == 'flutter' && (needs.sync-assets.result == 'success' || needs.sync-assets.result == 'skipped')
+    if: always() && inputs.engine == 'flutter' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -532,7 +532,7 @@ jobs:
 
   godot:
     needs: [sync-assets]
-    if: always() && inputs.engine == 'godot' && (needs.sync-assets.result == 'success' || needs.sync-assets.result == 'skipped')
+    if: always() && inputs.engine == 'godot' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
@@ -794,7 +794,7 @@ jobs:
 
   unity:
     needs: [sync-assets]
-    if: always() && inputs.engine == 'unity' && (needs.sync-assets.result == 'success' || needs.sync-assets.result == 'skipped')
+    if: always() && inputs.engine == 'unity' && (needs['sync-assets'].result == 'success' || needs['sync-assets'].result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
