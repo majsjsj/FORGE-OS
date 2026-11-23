@@ -147,7 +147,7 @@ test("restore creates a new isolated branch at the selected snapshot and never u
     assert.fail(`Unexpected GitHub request: ${options.method || "GET"} ${path}`);
   });
 
-  assert.equal(result.payload.error, undefined);
+  assert.equal(result.payload.result.isError, false);
   assert.equal(result.value.restored, true);
   assert.equal(result.value.restored_commit_sha, backupSha);
   assert.equal(result.value.new_branch, newBranch);
@@ -169,8 +169,8 @@ test("restore refuses main and the original branch as destinations", async () =>
       requests += 1;
       return githubResponse({});
     });
-    assert.equal(result.payload.error, true);
-    assert.match(result.payload.content[0].text, /different isolated/);
+    assert.equal(result.payload.result.isError, true);
+    assert.match(result.payload.result.content[0].text, /different isolated/);
     assert.equal(requests, 0);
   }
 });
