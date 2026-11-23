@@ -111,6 +111,16 @@ const TOOLS = [
     }
   },
   {
+    name: "forge_project_branch_compare",
+    description: "Compare an isolated project branch with main without merging. Returns ahead/behind counts, changed-file summary, and a GitHub compare URL for review. Read-only.",
+    inputSchema: {
+      type: "object",
+      properties: { branch: { type: "string", description: "An existing forge/projects/ branch." } },
+      required: ["branch"],
+      additionalProperties: false
+    }
+  },
+  {
     name: "forge_project_branch_list",
     description: "List existing isolated project branches under forge/projects/. Read-only.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false }
@@ -261,6 +271,26 @@ async function callTool(name, args, env) {
     });
     return { created: true, branch, base_branch: baseBranch, commit_sha: created.object.sha,
       message: "Project branch created. Subsequent project edits and builds should target this branch, not main." };
+  }
+
+  if (name === "forge_project_branch_compare") {
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main") throw new Error("Choose a forge/projects/ branch to compare with main.");
+    const compare = await github(env, "compare/main..." + branch);
+    return {
+      branch,
+      base_branch: "main",
+      status: compare.status,
+      ahead_by: compare.ahead_by,
+      behind_by: compare.behind_by,
+      total_commits: compare.total_commits,
+      changed_files: (compare.files || []).slice(0, 100).map(file => ({
+        filename: file.filename, status: file.status, additions: file.additions, deletions: file.deletions
+      })),
+      files_truncated: (compare.files || []).length > 100,
+      compare_url: "https://github.com/" + REPO + "/compare/main..." + branch + "?expand=1",
+      note: "Read-only comparison. No merge, push to main, or build was performed."
+    };
   }
 
   if (name === "forge_project_branch_list") {
@@ -512,7 +542,7 @@ async function callTool(name, args, env) {
       github(env, `actions/runs/${runId}/artifacts?per_page=100`),
     ]);
     return {
-      run: { id: run.id, status: run.status, conclusion: run.conclusion, html_url: run.html_url,
+      run: { id: run.id, status: run.status, conclusion: run.conclusion, html_url: run.html_url, head_branch: run.head_branch, head_sha: run.head_sha,
         created_at: run.created_at, updated_at: run.updated_at },
       jobs: (jobs.jobs || []).map(j => ({ id: j.id, name: j.name, status: j.status,
         conclusion: j.conclusion, html_url: j.html_url,
