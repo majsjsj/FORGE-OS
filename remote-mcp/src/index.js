@@ -104,6 +104,16 @@ const TOOLS = [
     },
   },
   {
+    name: "forge_project_inspect",
+    description: "Inspect a committed project directory without running a build. Returns a bounded recursive file inventory, detected engine/framework, likely entry points, manifest summaries, and source-size totals. Read-only and does not consume Actions quota.",
+    inputSchema: {
+      type: "object",
+      properties: { project_path: { type: "string", description: "Project directory such as workspace/my-app." } },
+      required: ["project_path"],
+      additionalProperties: false
+    },
+  },
+  {
     name: "forge_workspace_batch_write",
     description: "Atomically create or update up to 40 UTF-8 project files in one Git commit. Requires confirm=true after the user asks for these edits. For every existing file, provide expected_sha from forge_workspace_read; new files must omit expected_sha. Rejects stale versions and never partially writes a batch.",
     inputSchema: {
@@ -221,6 +231,74 @@ async function callTool(name, args, env) {
     const saved = await github(env, `contents/${path}`, { method: "PUT", body: JSON.stringify(payload) });
     return { saved: true, path: saved.content.path, sha: saved.content.sha,
       commit_sha: saved.commit.sha, html_url: saved.content.html_url };
+  }
+
+  if (name === "forge_project_inspect") {
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory inside workspace/, not the workspace root.");
+    const ref = await github(env, "git/ref/heads/main");
+    const commit = await github(env, "git/commits/" + ref.object.sha);
+    const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
+    if (tree.truncated) throw new Error("Repository tree is too large for a complete safe project inventory.");
+    const prefix = projectPath + "/";
+    const files = (tree.tree || []).filter(item => item.type === "blob" && item.path.startsWith(prefix))
+      .filter(item => {
+        try { validateWorkspacePath(item.path); return true; }
+        catch { return false; }
+      });
+    if (!files.length) throw new Error("No committed project files were found at " + projectPath);
+    const totalBytes = files.reduce((sum, item) => sum + (item.size || 0), 0);
+    const names = new Set(files.map(item => item.path.slice(prefix.length)));
+    const has = suffix => names.has(suffix);
+    const manifests = ["package.json", "pubspec.yaml", "project.godot", "ProjectSettings/ProjectVersion.txt",
+      "pyproject.toml", "Cargo.toml", "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
+      "settings.gradle.kts", "index.html", "README.md"].filter(has);
+    const manifestData = {};
+    for (const name of manifests.slice(0, 8)) {
+      const item = files.find(file => file.path === prefix + name);
+      if (!item || (item.size || 0) > 100000) continue;
+      const result = await github(env, "contents/" + item.path);
+      if (result.encoding === "base64" && typeof result.content === "string")
+        manifestData[name] = decodeBase64Utf8(result.content);
+    }
+    let engine = "unknown";
+    let framework = "unknown";
+    if (has("project.godot")) { engine = "Godot"; framework = "Godot project"; }
+    else if (has("ProjectSettings/ProjectVersion.txt") || names.has("Assets") || [...names].some(n => n.startsWith("Assets/"))) {
+      engine = "Unity"; framework = "Unity project";
+    } else if (has("pubspec.yaml")) {
+      engine = "Flutter";
+      framework = /sdk:\s*flutter/.test(manifestData["pubspec.yaml"] || "") ? "Flutter" : "Dart";
+    } else if (has("package.json")) {
+      engine = "Web / Node.js";
+      try {
+        const pkg = JSON.parse(manifestData["package.json"] || "{}");
+        const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+        framework = deps.next ? "Next.js" : deps.vite ? "Vite" : deps.react ? "React" :
+          deps.vue ? "Vue" : deps.svelte ? "Svelte" : deps.express ? "Express / Node.js" : "Node.js";
+      } catch { framework = "Node.js (invalid package.json)"; }
+    } else if (has("pyproject.toml")) { engine = "Python"; framework = "Python project"; }
+    else if (has("Cargo.toml")) { engine = "Rust"; framework = "Cargo"; }
+    else if (has("build.gradle") || has("build.gradle.kts") || has("settings.gradle") || has("settings.gradle.kts")) {
+      engine = "Android / JVM"; framework = "Gradle";
+    } else if (has("index.html")) { engine = "Web"; framework = "Static HTML/CSS/JS"; }
+    const entryCandidates = ["index.html", "lib/main.dart", "src/main.js", "src/main.ts", "src/main.tsx",
+      "src/App.jsx", "src/App.tsx", "main.py", "project.godot", "Assets/Scenes", "app/src/main/AndroidManifest.xml"]
+      .filter(has);
+    const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path));
+    return {
+      project_path: projectPath,
+      branch: "main",
+      engine,
+      framework,
+      file_count: files.length,
+      total_source_bytes: totalBytes,
+      truncated_inventory: sorted.length > 300,
+      files: sorted.slice(0, 300).map(item => ({ path: item.path, size: item.size || 0, sha: item.sha })),
+      manifests_found: manifests,
+      likely_entry_points: entryCandidates,
+      note: "Read-only inventory of committed main-branch files. No project code was executed and no build was started."
+    };
   }
 
   if (name === "forge_workspace_batch_write") {
@@ -485,8 +563,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.2.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Use forge_workspace_batch_write to atomically create/update related files in one commit; existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.3.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Use forge_project_inspect to inventory a committed project before editing; use forge_workspace_batch_write to atomically create/update related files in one commit; existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
