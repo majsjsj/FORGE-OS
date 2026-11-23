@@ -118,8 +118,8 @@ jobs:
                   size = src.stat().st_size
                   total += size
                   files.append(rel)
-                  if len(files) > 200 or total > 50000000:
-                      raise SystemExit("Save limit reached: maximum 200 files and 50 MB per cloud session.")
+                  if len(files) > 250 or total > 75000000:
+                      raise SystemExit("Save limit reached: maximum 250 files and 75 MB per cloud session.")
                   dest = payload / rel
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   dest.write_bytes(src.read_bytes())
@@ -145,8 +145,8 @@ jobs:
               size = src.stat().st_size
               total += size
               files.append(rel)
-              if len(files) + len(deleted) > 200 or total > 50000000:
-                  raise SystemExit("Save limit reached: maximum 200 changed paths and 50 MB of changed file data per cloud session.")
+              if len(files) + len(deleted) > 250 or total > 75000000:
+                  raise SystemExit("Save limit reached: maximum 250 changed paths and 75 MB of changed file data per cloud session.")
               dest = payload / rel
               dest.parent.mkdir(parents=True, exist_ok=True)
               dest.write_bytes(src.read_bytes())
@@ -206,8 +206,8 @@ jobs:
             const branch = process.env.PROJECT_BRANCH;
             if (!branch.startsWith('forge/projects/') || branch.includes('..'))
               throw new Error('Invalid isolated project branch.');
-            if (manifest.files.length > 200 || manifest.total_bytes > 50000000)
-              throw new Error('Project delta exceeds the 200-file / 50-MB save limit.');
+            if (manifest.files.length > 250 || manifest.total_bytes > 75000000)
+              throw new Error('Project delta exceeds the 250-file / 75-MB save limit.');
             const blocked = p => p.split('/').some(part => ['.git','.github','.claude','.npmrc','.pypirc','key.properties','keystore.properties','id_rsa','id_ed25519'].includes(part.toLowerCase()) || /^\.env/i.test(part) || /secret|credential|service-account/i.test(part)) ||
               /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(p);
             const ref = await github.rest.git.getRef({owner: context.repo.owner, repo: context.repo.repo, ref: 'heads/' + branch});
