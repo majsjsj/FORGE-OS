@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Wrangler
         working-directory: remote-mcp
-        run: npm install --no-save --no-audit --no-fund wrangler@^4
+        run: npm install --no-save --no-package-lock --no-audit --no-fund
 
       - name: Validate deployment secrets
         env:
@@ -44,6 +44,10 @@ jobs:
           test -n "$CF_ACCOUNT" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID"; exit 1; }
           test -n "$GH_TOKEN" || { echo "::error::Missing FORGE_GITHUB_TOKEN"; exit 1; }
           test "${#ACCESS_TOKEN}" -ge 32 || { echo "::error::FORGE_ACCESS_TOKEN must contain at least 32 characters"; exit 1; }
+
+      - name: Build MCP Apps preview bundle
+        working-directory: remote-mcp
+        run: npm run build:preview-app
 
       - name: Deploy Worker
         working-directory: remote-mcp
