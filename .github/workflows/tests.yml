@@ -26,5 +26,9 @@ jobs:
         run: node --check studio/features.js
       - name: Check advanced Studio tools JavaScript
         run: node --check studio/advanced-tools.js
+      - name: Verify deployed Studio bundles include all runtime modules
+        run: |
+          grep -q 'studio/advanced-tools.js _site/studio/' .github/workflows/deploy-web-studio.yml
+          grep -q 'studio/advanced-tools.js _site/studio/' .github/workflows/forge-on-demand.yml
       - name: Check remote MCP Worker JavaScript
         run: node --check remote-mcp/src/index.js
