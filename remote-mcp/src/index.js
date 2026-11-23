@@ -117,17 +117,17 @@ const TOOLS = [
   },
   {
     name: "forge_workspace_list",
-    description: "List files and folders inside workspace/ in the connected FORGE repository.",
+    description: "List files and folders inside workspace/ on a selected project branch (defaults to main).",
     inputSchema: { type: "object", properties: { path: { type: "string", description: "workspace/ or a subfolder under it." }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["path"], additionalProperties: false },
   },
   {
     name: "forge_workspace_read",
-    description: "Read a UTF-8 project file committed in workspace/. Returns its blob SHA for safe updates.",
+    description: "Read a UTF-8 project file from a selected branch. Returns its blob SHA for safe updates.",
     inputSchema: { type: "object", properties: { path: { type: "string" }, branch: { type: "string", description: "Project branch; defaults to main." } }, required: ["path"], additionalProperties: false },
   },
   {
     name: "forge_workspace_write",
-    description: "Create or update a UTF-8 project file in workspace/ as a Git commit. Requires confirm=true after the user asks you to create or edit project files. For updates, pass the SHA returned by forge_workspace_read.",
+    description: "Create or update a UTF-8 project file on a forge/projects/ branch as a Git commit. Direct writes to main are blocked. Requires confirm=true. For updates, pass the SHA returned by forge_workspace_read.",
     inputSchema: {
       type: "object",
       properties: {
@@ -143,7 +143,7 @@ const TOOLS = [
   },
   {
     name: "forge_project_inspect",
-    description: "Inspect a committed project directory without running a build. Returns a bounded recursive file inventory, detected engine/framework, likely entry points, manifest summaries, and source-size totals. Read-only and does not consume Actions quota.",
+    description: "Inspect a committed project directory on a selected branch without running a build. Returns a bounded recursive inventory, detected engine/framework, entry points, and source-size totals.",
     inputSchema: {
       type: "object",
       properties: { project_path: { type: "string", description: "Project directory such as workspace/my-app." }, branch: { type: "string", description: "Project branch; defaults to main." } },
@@ -153,7 +153,7 @@ const TOOLS = [
   },
   {
     name: "forge_workspace_batch_write",
-    description: "Atomically create or update up to 40 UTF-8 project files in one Git commit. Requires confirm=true after the user asks for these edits. For every existing file, provide expected_sha from forge_workspace_read; new files must omit expected_sha. Rejects stale versions and never partially writes a batch.",
+    description: "Atomically create or update up to 40 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
       type: "object",
       properties: {
@@ -289,6 +289,7 @@ async function callTool(name, args, env) {
   if (name === "forge_workspace_write") {
     const path = validateWorkspacePath(args.path);
     const branch = validateProjectBranch(args.branch || "main");
+    if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     if (args.confirm !== true) throw new Error("Write not performed: confirm=true is required after the user asks to create or edit project files.");
     if (typeof args.content !== "string" || new TextEncoder().encode(args.content).length > 500000)
       throw new Error("File content must be UTF-8 text no larger than 500 KB.");
@@ -366,7 +367,7 @@ async function callTool(name, args, env) {
       files: sorted.slice(0, 300).map(item => ({ path: item.path, size: item.size || 0, sha: item.sha })),
       manifests_found: manifests,
       likely_entry_points: entryCandidates,
-      note: "Read-only inventory of committed main-branch files. No project code was executed and no build was started."
+      note: "Read-only inventory of committed files on the selected branch. No project code was executed and no build was started."
     };
   }
 
@@ -375,6 +376,7 @@ async function callTool(name, args, env) {
     if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 40)
       throw new Error("files must contain between 1 and 40 file entries.");
     const branch = validateProjectBranch(args.branch || "main");
+    if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     const seen = new Set();
     let totalBytes = 0;
     for (const file of args.files) {
@@ -442,8 +444,8 @@ async function callTool(name, args, env) {
     const base = (env.PREVIEW_BASE_URL || "https://forge-os-remote-mcp.ma5103032.workers.dev").replace(/\/$/, "");
     const projectDir = entry.slice(0, entry.lastIndexOf("/"));
     return { entry_file: entry, branch, preview_url: base + "/preview/" + entry.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
-      version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/"),
-      mode: "interactive-browser-preview", auto_refresh: true, source: "committed main branch",
+      version_url: base + "/preview-version/" + projectDir.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch),
+      mode: "interactive-browser-preview", auto_refresh: true, source: "committed " + branch + " branch",
       note: "The preview refreshes after a new commit touching this project folder. This endpoint serves static browser projects and exported Web builds; it does not run native Android APKs." };
   }
 
@@ -640,7 +642,7 @@ export default {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "FORGE-OS Remote Controller", version: "0.4.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Project writes stay on their branch; do not write project work to main. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
