@@ -40,8 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.project_branch || github.ref }}
           persist-credentials: false
+          ref: ${{ inputs.project_branch || github.ref }}
+      - name: Verify explicitly staged external assets
+        uses: ./.github/actions/verify-forge-assets
+        with:
+          project_path: ${{ inputs.project_path }}
+          project_branch: ${{ inputs.project_branch || github.ref_name }}
       - name: Validate project path
         env:
           PROJECT_PATH: ${{ inputs.project_path }}
@@ -153,6 +158,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Verify explicitly staged external assets
+        uses: ./.github/actions/verify-forge-assets
+        with:
+          project_path: ${{ inputs.project_path }}
+          project_branch: ${{ inputs.project_branch || github.ref_name }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -292,6 +302,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Verify explicitly staged external assets
+        uses: ./.github/actions/verify-forge-assets
+        with:
+          project_path: ${{ inputs.project_path }}
+          project_branch: ${{ inputs.project_branch || github.ref_name }}
       - uses: actions/setup-java@v4
         if: inputs.output == 'apk' || inputs.output == 'aab'
         with:
@@ -488,6 +503,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.project_branch || github.ref }}
+      - name: Verify explicitly staged external assets
+        uses: ./.github/actions/verify-forge-assets
+        with:
+          project_path: ${{ inputs.project_path }}
+          project_branch: ${{ inputs.project_branch || github.ref_name }}
       - name: Validate Unity project and license
         env:
           PROJECT_PATH: ${{ inputs.project_path }}

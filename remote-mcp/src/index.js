@@ -955,6 +955,8 @@ async function callTool(name, args, env) {
             path.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) ||
               /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
           throw new Error("Every asset_path must be a safe relative path without hidden, traversal, or credential-like segments.");
+        if (path === "forge-assets-manifest.json")
+          throw new Error("forge-assets-manifest.json is reserved for FORGE asset integrity metadata.");
         if (seen.has(path)) throw new Error("Duplicate asset_path in batch: " + path);
         seen.add(path);
         selected.push({ asset_path: path, destination: validateWorkspacePath(project + "/" + path) });
@@ -963,10 +965,37 @@ async function callTool(name, args, env) {
       const currentCommit = await github(env, "git/commits/" + parent);
       const currentTree = await github(env, "git/trees/" + currentCommit.tree.sha + "?recursive=1");
       if (currentTree.truncated) throw new Error("Repository tree is too large to safely stage this asset batch.");
-      const existing = new Set((currentTree.tree || []).filter(item => item.type === "blob").map(item => item.path));
+      const treeFiles = (currentTree.tree || []).filter(item => item.type === "blob");
+      const existing = new Map(treeFiles.map(item => [item.path, item]));
       for (const item of selected) {
         if (existing.has(item.destination))
           throw new Error("A destination already exists; no files were overwritten and no commit was created: " + item.destination);
+      }
+      const manifestPath = project + "/forge-assets-manifest.json";
+      let manifestFiles = [];
+      const oldManifest = existing.get(manifestPath);
+      if (oldManifest) {
+        const blob = await github(env, "git/blobs/" + oldManifest.sha);
+        let parsed;
+        try { parsed = JSON.parse(decodeBase64Utf8(blob.content)); } catch { throw new Error("Existing forge-assets-manifest.json is invalid; no assets were imported."); }
+        if (parsed?.format !== "forge-assets-manifest-v1" || parsed.branch !== branch ||
+            parsed.project_path !== project || !Array.isArray(parsed.files))
+          throw new Error("Existing asset manifest does not match this branch/project; no assets were imported.");
+        manifestFiles = parsed.files;
+        if (manifestFiles.length > 5000) throw new Error("Existing asset manifest exceeds the 5,000-entry safety limit.");
+        const priorPaths = new Set();
+        const priorDestinations = new Set();
+        for (const item of manifestFiles) {
+          if (!item || typeof item.asset_path !== "string" || typeof item.path !== "string" ||
+              !/^[a-f0-9]{64}$/i.test(item.sha256 || "") || !Number.isSafeInteger(item.size_bytes) || item.size_bytes <= 0 ||
+              item.path.startsWith("/") || item.path.includes("..") || item.path.includes("\\") || item.path !== item.asset_path || item.path.split("/").some(part => !part || part.startsWith(".")) ||
+              priorPaths.has(item.asset_path) || priorDestinations.has(item.path))
+            throw new Error("Existing asset manifest contains invalid or duplicate entries; no assets were imported.");
+          priorPaths.add(item.asset_path);
+          priorDestinations.add(item.path);
+        }
+        for (const item of selected) if (priorPaths.has(item.asset_path) || priorDestinations.has(item.asset_path))
+          throw new Error("Asset is already recorded in forge-assets-manifest.json: " + item.asset_path);
       }
       const staged = [];
       let totalBytes = 0;
@@ -984,8 +1013,10 @@ async function callTool(name, args, env) {
         let binary = "";
         for (let offset = 0; offset < bytes.length; offset += 0x8000)
           binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-        staged.push({ ...item, bytes: bytes.length, content_type: object.httpMetadata?.contentType || "application/octet-stream",
-          binary });
+        const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+        const sha256 = Array.from(digest).map(value => value.toString(16).padStart(2, "0")).join("");
+        staged.push({ ...item, bytes: bytes.length, sha256,
+          content_type: object.httpMetadata?.contentType || "application/octet-stream", binary });
       }
       const treeEntries = [];
       for (const item of staged) {
@@ -994,8 +1025,19 @@ async function callTool(name, args, env) {
           body: JSON.stringify({ content: btoa(item.binary), encoding: "base64" })
         });
         treeEntries.push({ path: item.destination, mode: "100644", type: "blob", sha: blob.sha });
+        manifestFiles.push({ asset_path: item.asset_path, path: item.destination.slice(project.length + 1),
+          size_bytes: item.bytes, sha256: item.sha256, content_type: item.content_type });
         delete item.binary;
       }
+      const manifest = {
+        format: "forge-assets-manifest-v1", branch, project_path: project,
+        files: manifestFiles.sort((a, b) => a.path.localeCompare(b.path))
+      };
+      const manifestBlob = await github(env, "git/blobs", {
+        method: "POST",
+        body: JSON.stringify({ content: JSON.stringify(manifest, null, 2) + "\n", encoding: "utf-8" })
+      });
+      treeEntries.push({ path: manifestPath, mode: "100644", type: "blob", sha: manifestBlob.sha });
       const nextTree = await github(env, "git/trees", {
         method: "POST",
         body: JSON.stringify({ base_tree: currentCommit.tree.sha, tree: treeEntries })
@@ -1009,8 +1051,8 @@ async function callTool(name, args, env) {
         body: JSON.stringify({ sha: nextCommit.sha, force: false })
       });
       return { imported: true, atomic_commit: true, branch, project_path: project, files: staged.map(item => ({
-        asset_path: item.asset_path, destination: item.destination, size_bytes: item.bytes, content_type: item.content_type
-      })), file_count: staged.length, total_size_bytes: totalBytes, commit_sha: nextCommit.sha,
+        asset_path: item.asset_path, destination: item.destination, size_bytes: item.bytes, sha256: item.sha256, content_type: item.content_type
+      })), manifest_path: manifestPath, file_count: staged.length, total_size_bytes: totalBytes, commit_sha: nextCommit.sha,
         commit_url: nextCommit.html_url,
         note: "All selected assets were committed together to the isolated project branch. The next explicitly authorized build can package these files; no build was started." };
     }
