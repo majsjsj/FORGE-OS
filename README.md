@@ -7,7 +7,7 @@
 - FORGE Director: deterministic project classification, task breakdown, and specialist-agent routing (planning only).
 - Project studios and scaffolds for web, Android, Flutter, browser games, Unity, Godot, SaaS, and APIs.
 - A clean, project-agnostic browser workspace with Monaco editing, a sandboxed preview, and desktop/mobile viewport sizing.
-- **FORGE MOTION:** a creative-production workspace for voice-led video planning, 2D/3D animation, stickman, product advertising, Blender-oriented shot design, camera direction, sound notes, and an editable storyboard/timeline. The current milestone exports a production-plan JSON; it does not yet render finished MP4/video.
+- **FORGE MOTION:** a creative-production workspace for voice-led video planning, 2D/3D animation, stickman, product advertising, Blender-oriented shot design, camera direction, sound notes, and an editable storyboard/timeline. The workspace also includes a local video preview, optional external-audio synchronization, editable subtitle cues, SRT/VTT import/export, caption styling and approximate word-highlight mode. These are browser-side preview/editing capabilities; the complete AI generation, Blender/2D/3D render engines, forced word alignment, multitrack compositor and final MP4 export still require backend integrations and end-to-end validation.
 - Mobile build pipeline: local toolchain detection and guarded APK/AAB build adapters for Gradle/Flutter, plus Unity/Godot Android export entry points.
 - Google Play preparation: listing metadata and a human-review release checklist.
 - AdMob planning: platform-specific setup plans with test-mode placeholders; no live ad IDs or automatic publishing.
