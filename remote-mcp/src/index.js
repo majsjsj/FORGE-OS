@@ -1,6 +1,7 @@
 const REPO = "majsjsj/FORGE-OS";
 const WORKFLOW = "forge-on-demand.yml";
 const TERMINAL_WORKFLOW = "forge-terminal.yml";
+const CLOUD_WORKFLOW = "forge-cloud-session.yml";
 const PROTOCOL_VERSION = "2025-03-26";
 
 function json(data, status = 200) {
@@ -164,7 +165,7 @@ const TOOLS = [
   },
   {
     name: "forge_workspace_batch_write",
-    description: "Atomically create or update up to 40 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
+    description: "Atomically create or update up to 100 UTF-8 project files on a forge/projects/ branch in one Git commit. Direct writes to main are blocked. Requires confirm=true. Existing files require expected_sha from forge_workspace_read; stale updates are rejected.",
     inputSchema: {
       type: "object",
       properties: {
@@ -172,7 +173,7 @@ const TOOLS = [
         files: {
           type: "array",
           minItems: 1,
-          maxItems: 40,
+          maxItems: 100,
           items: {
             type: "object",
             properties: {
@@ -235,6 +236,25 @@ const TOOLS = [
       additionalProperties: false
     }
   },
+  {
+    name: "forge_cloud_run",
+    description: "Run a user-requested setup, dependency installation, test, or project command in a fresh isolated GitHub-hosted cloud workspace. The runner is temporary, has no repository secrets, and has a 10-minute command limit. Requires confirm=true. Set save_changes=true only when the user explicitly wants resulting project files committed to the same isolated forge/projects/ branch; saved changes are limited to 200 files and 50 MB per session. This consumes GitHub Actions quota.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        branch: { type: "string", description: "Existing forge/projects/ branch; main is not allowed." },
+        project_path: { type: "string", description: "Project directory inside workspace/." },
+        command: { type: "string", description: "Command to run in the project folder, maximum 8000 characters. Never include secrets." },
+        save_changes: { type: "boolean", description: "Optional; true commits changed files back to this project branch. Defaults to false." },
+        confirm: { type: "boolean" }
+      },
+      required: ["branch", "project_path", "command", "confirm"],
+      additionalProperties: false
+    }
+  },
+  { name: "forge_cloud_latest", description: "Get the latest FORGE cloud execution session status and URL. Read-only.", inputSchema: { type: "object", properties: {}, additionalProperties: false } },
+  { name: "forge_cloud_details", description: "Get status and job steps for one cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" } }, required: ["run_id"], additionalProperties: false } },
+  { name: "forge_cloud_logs", description: "Read the tail of logs for a job belonging to a cloud execution session.", inputSchema: { type: "object", properties: { run_id: { type: "integer" }, job_id: { type: "integer" } }, required: ["run_id", "job_id"], additionalProperties: false } },
   {
     name: "forge_health",
     description: "Check that the authenticated FORGE remote controller is online and configured. Does not start a build.",
@@ -439,8 +459,8 @@ async function callTool(name, args, env) {
 
   if (name === "forge_workspace_batch_write") {
     if (args.confirm !== true) throw new Error("Batch write not performed: confirm=true is required after the user asks for these project edits.");
-    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 40)
-      throw new Error("files must contain between 1 and 40 file entries.");
+    if (!Array.isArray(args.files) || args.files.length < 1 || args.files.length > 100)
+      throw new Error("files must contain between 1 and 100 file entries.");
     const branch = validateProjectBranch(args.branch || "main");
     if (branch === "main") throw new Error("Direct writes to main are blocked. Create a forge/projects/ branch first.");
     const seen = new Set();
@@ -453,12 +473,12 @@ async function callTool(name, args, env) {
       if (typeof file.content !== "string" || file.content.includes("\0"))
         throw new Error("Each file must contain valid UTF-8 text without NUL bytes.");
       const size = new TextEncoder().encode(file.content).length;
-      if (size > 500000) throw new Error("Each file must be no larger than 500 KB: " + file.path);
+      if (size > 2000000) throw new Error("Each text file must be no larger than 2 MB: " + file.path);
       totalBytes += size;
       if (file.expected_sha !== undefined && (typeof file.expected_sha !== "string" || !/^[a-f0-9]{40}$/i.test(file.expected_sha)))
         throw new Error("Invalid expected_sha for " + file.path);
     }
-    if (totalBytes > 2000000) throw new Error("The complete batch must be no larger than 2 MB.");
+    if (totalBytes > 10000000) throw new Error("The complete atomic batch must be no larger than 10 MB. Use multiple batches or a cloud session for larger projects.");
     const parent = await branchHead(env, branch);
     const commit = await github(env, "git/commits/" + parent);
     const tree = await github(env, "git/trees/" + commit.tree.sha + "?recursive=1");
@@ -593,6 +613,53 @@ async function callTool(name, args, env) {
     if (!response.ok) throw new Error(`GitHub terminal logs API ${response.status}.`);
     const logs = await response.text();
     return { run_id: runId, job_id: jobId, truncated: logs.length > 16000, logs: logs.slice(-16000) };
+  }
+
+  if (name === "forge_cloud_run") {
+    if (args.confirm !== true) throw new Error("Cloud session not started: confirm=true is required after the user explicitly requests execution.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main") throw new Error("Cloud execution requires an isolated forge/projects/ branch; main is not allowed.");
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory inside workspace/.");
+    if (typeof args.command !== "string" || !args.command.trim() || args.command.length > 8000 || args.command.includes("\0"))
+      throw new Error("command must be non-empty, contain no NUL bytes, and be no longer than 8000 characters.");
+    const saveChanges = args.save_changes === true;
+    await branchHead(env, branch);
+    await github(env, `actions/workflows/${CLOUD_WORKFLOW}/dispatches`, {
+      method: "POST",
+      body: JSON.stringify({ ref: branch, inputs: { project_branch: branch, project_path: projectPath, command: args.command, save_changes: String(saveChanges) } })
+    });
+    return { accepted: true, branch, project_path: projectPath, save_changes: saveChanges, command_timeout_seconds: 600, workflow: CLOUD_WORKFLOW,
+      message: saveChanges ? "Cloud session accepted. Changed files will be committed only inside the selected project directory and only to the same isolated branch. Use forge_cloud_latest/details/logs to inspect it." : "Cloud session accepted. Changes are temporary and will be discarded when the runner ends. Use forge_cloud_latest/details/logs to inspect it." };
+  }
+
+  if (name === "forge_cloud_latest") {
+    const data = await github(env, `actions/workflows/${CLOUD_WORKFLOW}/runs?per_page=1`);
+    const run = data.workflow_runs?.[0];
+    if (!run) return { found: false, message: "No cloud execution sessions found yet." };
+    return { found: true, run_id: run.id, status: run.status, conclusion: run.conclusion, html_url: run.html_url, created_at: run.created_at, updated_at: run.updated_at, branch: run.head_branch, head_sha: run.head_sha };
+  }
+
+  if (name === "forge_cloud_details") {
+    const runId = Number(args.run_id);
+    if (!Number.isSafeInteger(runId) || runId <= 0) throw new Error("Invalid run_id.");
+    const run = await github(env, `actions/runs/${runId}`);
+    if (run.path !== `.github/workflows/${CLOUD_WORKFLOW}`) throw new Error("This run was not created by the FORGE cloud execution workflow.");
+    const jobs = await github(env, `actions/runs/${runId}/jobs?per_page=100`);
+    return { run: { id: run.id, status: run.status, conclusion: run.conclusion, html_url: run.html_url, branch: run.head_branch, head_sha: run.head_sha }, jobs: (jobs.jobs || []).map(job => ({ id: job.id, name: job.name, status: job.status, conclusion: job.conclusion, html_url: job.html_url, steps: (job.steps || []).map(step => ({ name: step.name, status: step.status, conclusion: step.conclusion })) })) };
+  }
+
+  if (name === "forge_cloud_logs") {
+    const runId = Number(args.run_id), jobId = Number(args.job_id);
+    if (!Number.isSafeInteger(runId) || runId <= 0 || !Number.isSafeInteger(jobId) || jobId <= 0) throw new Error("Invalid run_id or job_id.");
+    const run = await github(env, `actions/runs/${runId}`);
+    if (run.path !== `.github/workflows/${CLOUD_WORKFLOW}`) throw new Error("This run was not created by the FORGE cloud execution workflow.");
+    const jobs = await github(env, `actions/runs/${runId}/jobs?per_page=100`);
+    if (!(jobs.jobs || []).some(job => job.id === jobId)) throw new Error("job_id does not belong to this cloud session.");
+    const response = await fetch(`https://api.github.com/repos/${REPO}/actions/jobs/${jobId}/logs`, { headers: { "user-agent": "FORGE-OS-Remote-Controller/1.0", "authorization": `Bearer ${env.GITHUB_TOKEN}`, "accept": "application/vnd.github+json", "x-github-api-version": "2022-11-28" } });
+    if (!response.ok) throw new Error(`GitHub cloud logs API ${response.status}.`);
+    const logs = await response.text();
+    return { run_id: runId, job_id: jobId, truncated: logs.length > 20000, logs: logs.slice(-20000) };
   }
 
   if (name === "forge_health") {
@@ -769,8 +836,8 @@ export default {
       return rpc(message.id, {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.5.0" },
-        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run only for explicitly requested commands on that branch; terminal execution uses a temporary runner without repository secrets and discards filesystem changes; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
+        serverInfo: { name: "FORGE-OS Remote Controller", version: "0.6.0" },
+        instructions: "FORGE executes only explicitly requested on-demand builds. Project source must be committed under workspace/. Create an isolated forge/projects/<name> branch with forge_project_branch_create before project work; use forge_terminal_run for short disposable commands; use forge_cloud_run for dependency installation, longer tests, and project tasks; cloud sessions use a temporary runner without repository secrets and can save project-only changes to the same isolated branch only when save_changes=true; use forge_project_branch_list to find projects. Pass that branch to forge_project_inspect, forge_workspace_list/read/write/batch_write, forge_preview_url, and forge_dispatch_build. Writes to main are blocked; project changes stay isolated until explicitly reviewed and merged. Existing files require expected_sha from forge_workspace_read. Use forge_preview_url for interactive browser previews of committed HTML projects; use forge_game_preview_url to retrieve the latest successfully deployed Godot/Unity Web build; preview is read-only and auto-refreshes when a new commit touches the project folder. Never claim a build succeeded until forge_build_details confirms it.",
       });
     }
     if (message.method === "ping") return rpc(message.id, {});
