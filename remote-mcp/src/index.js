@@ -1,4 +1,5 @@
 import previewAppBundle from "./preview-app-bundle.js";
+import previewAppHtml from "./preview-app.html";
 const REPO = "majsjsj/FORGE-OS";
 const WORKFLOW = "forge-on-demand.yml";
 const TERMINAL_WORKFLOW = "forge-terminal.yml";
@@ -1971,10 +1972,7 @@ export default {
       const uri = message.params?.uri;
       if (uri !== "ui://forge-os/live-preview.html")
         return rpcError(message.id, -32602, "Unknown UI resource URI.");
-      const html = (await (async () => {
-        const response = await fetch(new URL("./preview-app.html", import.meta.url));
-        return response.ok ? response.text() : null;
-      })()).replace("/*__EXT_APPS_BUNDLE__*/", previewAppBundle);
+      const html = previewAppHtml.replace("/*__EXT_APPS_BUNDLE__*/", previewAppBundle);
       return rpc(message.id, { contents: [{
         uri,
         mimeType: "text/html;profile=mcp-app",
