@@ -922,11 +922,12 @@ async function callTool(name, args, env) {
     validateProjectPlanDocument(plan);
     const byId = new Map(plan.tasks.map(task => [task.id, task]));
     const completed = plan.tasks.filter(task => task.status === "completed");
-    const inProgress = plan.tasks.filter(task => task.status === "in_progress");
-    const blocked = plan.tasks.filter(task => task.status === "blocked" ||
-      task.depends_on.some(id => byId.get(id).status !== "completed"));
-    const ready = plan.tasks.filter(task => task.status !== "completed" && task.status !== "blocked" &&
-      task.depends_on.every(id => byId.get(id).status === "completed"));
+    const blocked = plan.tasks.filter(task => task.status !== "completed" &&
+      (task.status === "blocked" || task.depends_on.some(id => byId.get(id).status !== "completed")));
+    const blockedIds = new Set(blocked.map(task => task.id));
+    const inProgress = plan.tasks.filter(task => task.status === "in_progress" && !blockedIds.has(task.id));
+    const ready = plan.tasks.filter(task => (task.status || "pending") === "pending" &&
+      !blockedIds.has(task.id) && task.depends_on.every(id => byId.get(id).status === "completed"));
     const summarize = task => ({
       id: task.id, title: task.title, status: task.status || "pending",
       depends_on: task.depends_on,
