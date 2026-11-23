@@ -1849,7 +1849,7 @@ async function handleGamePreview(request, url) {
     path = decodeURIComponent(url.pathname.slice("/game-preview/".length));
     const segments = path.split("/");
     const buildId = segments.shift();
-    if (!/^\\d{1,20}$/.test(buildId || "")) throw new Error("A valid deployed build ID is required.");
+    if (!/^\d{1,20}$/.test(buildId || "")) throw new Error("A valid deployed build ID is required.");
     path = segments.join("/") || "index.html";
     if (path.length > 500 || !/^[A-Za-z0-9._/-]+$/.test(path) || path.includes("\\\\") ||
         path.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")))
@@ -1868,7 +1868,7 @@ async function handleGamePreview(request, url) {
     return new Response("Game preview upstream is unavailable.", { status: 502 });
   }
   const headers = new Headers(upstream.headers);
-  headers.set("cache-control", "public, max-age=31536000, immutable");
+  headers.set("cache-control", upstream.ok ? "public, max-age=31536000, immutable" : "no-store");
   headers.set("access-control-allow-origin", "*");
   headers.set("cross-origin-resource-policy", "cross-origin");
   headers.set("x-content-type-options", "nosniff");
