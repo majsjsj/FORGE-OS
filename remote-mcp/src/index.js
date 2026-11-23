@@ -392,7 +392,7 @@ const TOOLS = [
   },
   {
     name: "forge_asset_import",
-    description: "Copy one asset previously stored in the optional Cloudflare R2 bucket into the matching path under workspace/ on its isolated project branch. This makes the binary file part of the Git project so the next authorized build can package it. Requires confirm=true. Existing project files are never overwritten; choose a new asset_path or handle the conflict explicitly. Maximum imported file size is 16 MiB. Requires the FORGE_ASSETS_BUCKET binding.",
+    description: "Copy one asset previously stored in the optional Cloudflare R2 bucket into the matching path under workspace/ on its isolated project branch. This makes the binary file part of the Git project so the next authorized build can package it. Requires confirm=true. Existing project files are never overwritten; choose a new asset_path or handle the conflict explicitly. Maximum imported file size is 16 MiB. Records the file's SHA-256 in forge-assets-manifest.json so the next engine job can verify it. Requires the FORGE_ASSETS_BUCKET binding.",
     inputSchema: { type: "object", properties: { branch: { type: "string" }, project_path: { type: "string" }, asset_path: { type: "string" }, confirm: { type: "boolean" } }, required: ["branch","project_path","asset_path","confirm"], additionalProperties: false }
   },
   {
