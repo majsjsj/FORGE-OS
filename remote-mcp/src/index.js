@@ -953,7 +953,7 @@ async function callTool(name, args, env) {
         if (typeof path !== "string" || !path.length || !/^[A-Za-z0-9._/-]+$/.test(path) ||
             path.startsWith("/") || path.includes("..") ||
             path.split("/").some(part => !part || part.startsWith(".") || /secret|credential|service-account/i.test(part) ||
-              /\\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
+              /\.(pem|key|p12|pfx|jks|keystore|mobileprovision)$/i.test(part)))
           throw new Error("Every asset_path must be a safe relative path without hidden, traversal, or credential-like segments.");
         if (seen.has(path)) throw new Error("Duplicate asset_path in batch: " + path);
         seen.add(path);
