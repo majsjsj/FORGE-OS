@@ -40,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           ref: ${{ inputs.project_branch || github.ref }}
       - name: Verify explicitly staged external assets
         uses: ./.github/actions/verify-forge-assets
@@ -658,11 +659,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.project_branch || github.ref }}
-      - name: Verify explicitly staged external assets
-        uses: ./.github/actions/verify-forge-assets
-        with:
-          project_path: ${{ inputs.project_path }}
-          project_branch: ${{ inputs.project_branch || github.ref_name }}
       - name: Download browser game build
         uses: actions/download-artifact@v4
         with:
