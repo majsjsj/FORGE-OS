@@ -204,16 +204,20 @@ jobs:
                   raise SystemExit("Unsafe path in staged manifest.")
               if rel in known:
                   raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
-              source = (stage / Path(*posix.parts)).resolve()
-              target = (project_root / Path(*posix.parts)).resolve()
-              if not source.is_relative_to(stage) or not source.is_file() or source.is_symlink():
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
                   raise SystemExit("Staged asset is missing or unsafe: " + rel)
-              if not target.is_relative_to(project_root) or target.exists() or target.is_symlink():
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
                   raise SystemExit("Refusing to overwrite an existing project path: " + rel)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(source, target)
               known.add(rel)
           existing["files"].extend(entries)
+          if len(existing["files"]) > 5000:
+              raise SystemExit("The FORGE asset manifest is limited to 5,000 entries.")
           target_manifest.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
           print("Added %d R2 assets to the project without overwriting existing files." % len(entries))
           PY
@@ -382,11 +386,13 @@ jobs:
                   raise SystemExit("Unsafe path in staged manifest.")
               if rel in known:
                   raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
-              source = (stage / Path(*posix.parts)).resolve()
-              target = (project_root / Path(*posix.parts)).resolve()
-              if not source.is_relative_to(stage) or not source.is_file() or source.is_symlink():
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
                   raise SystemExit("Staged asset is missing or unsafe: " + rel)
-              if not target.is_relative_to(project_root) or target.exists() or target.is_symlink():
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
                   raise SystemExit("Refusing to overwrite an existing project path: " + rel)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(source, target)
@@ -588,11 +594,13 @@ jobs:
                   raise SystemExit("Unsafe path in staged manifest.")
               if rel in known:
                   raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
-              source = (stage / Path(*posix.parts)).resolve()
-              target = (project_root / Path(*posix.parts)).resolve()
-              if not source.is_relative_to(stage) or not source.is_file() or source.is_symlink():
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
                   raise SystemExit("Staged asset is missing or unsafe: " + rel)
-              if not target.is_relative_to(project_root) or target.exists() or target.is_symlink():
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
                   raise SystemExit("Refusing to overwrite an existing project path: " + rel)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(source, target)
@@ -851,11 +859,13 @@ jobs:
                   raise SystemExit("Unsafe path in staged manifest.")
               if rel in known:
                   raise SystemExit("Asset path already exists in manifest; refusing overwrite: " + rel)
-              source = (stage / Path(*posix.parts)).resolve()
-              target = (project_root / Path(*posix.parts)).resolve()
-              if not source.is_relative_to(stage) or not source.is_file() or source.is_symlink():
+              raw_source = stage / Path(*posix.parts)
+              source = raw_source.resolve()
+              raw_target = project_root / Path(*posix.parts)
+              target = raw_target.resolve()
+              if not source.is_relative_to(stage) or raw_source.is_symlink() or not raw_source.is_file():
                   raise SystemExit("Staged asset is missing or unsafe: " + rel)
-              if not target.is_relative_to(project_root) or target.exists() or target.is_symlink():
+              if not target.is_relative_to(project_root) or raw_target.exists() or raw_target.is_symlink():
                   raise SystemExit("Refusing to overwrite an existing project path: " + rel)
               target.parent.mkdir(parents=True, exist_ok=True)
               shutil.copyfile(source, target)
