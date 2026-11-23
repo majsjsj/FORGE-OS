@@ -62,3 +62,8 @@ Keep workflows manual and short-lived. GitHub Actions, Codespaces, and Cloudflar
 - **Advanced Game Lab** is a 12×8 tile-map editor with terrain, walls, water, start/goal markers, enemies, and collectibles. It exports a versioned engine-neutral JSON level description. It is a level-data authoring tool, not a Godot/Unity runtime or full scene editor.
 - **Quality Assurance** parses the current HTML, compiles JavaScript for syntax validation without executing it, parses CSS using the browser CSS parser, and checks common accessibility and markup risks. It produces a downloadable JSON report. It is static local QA, not a full browser automation, device test, dependency audit, or security certification.
 - These tools run locally in the browser, add no external libraries, do not invoke cloud builds, and do not incur service charges.
+
+
+## Read-only release preflight
+
+The MCP tool `forge_project_preflight` runs a bounded structural check against committed files on the selected branch. It reuses the project inventory and reports a readiness state, blockers, warnings, and next actions for common Web, Flutter, Godot, and Unity layouts. It does not install packages, execute project code, start a browser, dispatch a workflow, or consume Actions quota. A structurally ready result is not evidence that the project runs; engine-specific tests and device verification remain separate approval-gated steps.
