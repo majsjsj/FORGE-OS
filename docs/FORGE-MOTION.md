@@ -1,6 +1,17 @@
 # FORGE MOTION — production architecture and current status
 
-## Implemented browser-side motion graphics milestone\n\n- Multi-scene sequence editor: add, select, duplicate, delete and reorder scenes; each scene stores its own title, subtitle, metric, chart data/type, template, accent, virtual camera move and duration.\n- Full-sequence preview and one-file WebM recording render scenes consecutively in order; the project JSON and local save include the sequence and selected scene.\n- Scene transitions are selectable per incoming scene: cut, fade, wipe and zoom. A visual clip timeline scales each clip by duration and lets the editor select scenes directly.\n- Dedicated motion graphics panel with editable title, subtitle, metric, supporting copy, chart values, visual template, accent color and virtual camera move.\n- Canvas animation renders animated typography, infographic line charts, bar charts or connected-node paths, data points, grid/particles and camera push, pull, pan, drift or static framing. The sequence includes an opening reveal and end fade.\n- Preview animation and real-time local WebM recording through the browser MediaRecorder API, with a 30 fps canvas stream.\n- Motion graphics settings are persisted with the project and included in JSON project import/export.\n- This browser renderer exports WebM video only; it does not yet mux audio, encode MP4, or provide a full multitrack editor.\n\n## Implemented browser-side post-production milestone
+## Implemented browser-side motion graphics milestone
+
+- Multi-scene sequence editor: add, select, duplicate, delete and reorder scenes; each scene stores its own title, subtitle, metric, chart data/type, template, accent, virtual camera move and duration.
+- Full-sequence preview and one-file WebM recording render scenes consecutively in order; the project JSON and local save include the sequence and selected scene.
+- Scene transitions are selectable per incoming scene: cut, fade, wipe and zoom. A visual clip timeline scales each clip by duration and lets the editor select scenes directly.
+- Dedicated motion graphics panel with editable title, subtitle, metric, supporting copy, chart values, visual template, accent color and virtual camera move.
+- Canvas animation renders animated typography, infographic line charts, bar charts or connected-node paths, data points, grid/particles and camera push, pull, pan, drift or static framing. The sequence includes an opening reveal and end fade.
+- Preview animation and real-time local WebM recording through the browser MediaRecorder API, with a 30 fps canvas stream.
+- Motion graphics settings are persisted with the project and included in JSON project import/export.
+- This browser renderer exports WebM video only; it does not yet mux audio, encode MP4, or provide a full multitrack editor.
+
+## Implemented browser-side post-production milestone
 
 - Local rendered-video preview (user selects a video file; no upload).
 - Optional external audio track with play/pause/seek synchronization against preview time.
