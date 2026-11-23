@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Fail CI when a GitHub Actions dependency is not pinned to a full commit SHA."""
 
 from __future__ import annotations
