@@ -126,8 +126,11 @@ jobs:
           for path in sorted(root.rglob("*")):
               if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
                   continue
-              data = path.read_bytes()
-              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              files.append({"path": path.relative_to(root).as_posix(), "size": path.stat().st_size, "sha256": digest.hexdigest()})
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
@@ -262,8 +265,11 @@ jobs:
           for path in sorted(root.rglob("*")):
               if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
                   continue
-              data = path.read_bytes()
-              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              files.append({"path": path.relative_to(root).as_posix(), "size": path.stat().st_size, "sha256": digest.hexdigest()})
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
@@ -455,8 +461,11 @@ jobs:
           for path in sorted(root.rglob("*")):
               if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
                   continue
-              data = path.read_bytes()
-              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              files.append({"path": path.relative_to(root).as_posix(), "size": path.stat().st_size, "sha256": digest.hexdigest()})
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
@@ -577,8 +586,11 @@ jobs:
           for path in sorted(root.rglob("*")):
               if path.is_symlink() or not path.is_file() or path.name == "forge-artifact-manifest.json":
                   continue
-              data = path.read_bytes()
-              files.append({"path": path.relative_to(root).as_posix(), "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+              digest = hashlib.sha256()
+              with path.open("rb") as stream:
+                  for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              files.append({"path": path.relative_to(root).as_posix(), "size": path.stat().st_size, "sha256": digest.hexdigest()})
           if not files:
               raise SystemExit("No files found to include in the artifact integrity manifest.")
           manifest = {"format": "forge-artifact-manifest-v1", "engine": os.environ["ENGINE"], "output": os.environ["OUTPUT"], "files": files}
