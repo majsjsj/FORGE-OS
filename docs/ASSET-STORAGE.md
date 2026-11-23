@@ -14,7 +14,7 @@ If the binding is absent, the asset tools return a clear configuration error and
 
 ## Asset tools
 
-- `forge_asset_upload`: upload one base64-encoded binary file to the selected project's external asset namespace. Requires `confirm=true`; maximum decoded size is 16 MiB per call.
+- `forge_asset_upload`: upload one base64-encoded binary file to the selected project's external asset namespace. Requires `confirm=true`; maximum decoded size is 32 MiB per call.
 - `forge_asset_list`: list up to 1,000 objects for a project (with a cursor when more remain).
 - `forge_asset_download_url`: create an HMAC-signed, read-only URL that expires after one hour.
 - `forge_asset_delete`: explicitly delete one object; requires `confirm=true`.
