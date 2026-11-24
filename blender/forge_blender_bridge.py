@@ -139,7 +139,7 @@ def import_model(item, assets_root):
         if source_duration <= 0 or target_duration <= 0:
             raise ValueError("Animation source and target frame ranges must be positive.")
         strip.repeat = repeat
-        strip.scale = (source_duration * repeat / target_duration) * float(animation.get("speed", 1.0))
+        strip.scale = target_duration / (source_duration * repeat * float(animation.get("speed", 1.0)))
         strip.blend_in = float(animation.get("blend_in", 0.0))
         strip.blend_out = float(animation.get("blend_out", 0.0))
         strip.use_auto_blend = False
