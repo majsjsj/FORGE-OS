@@ -62,7 +62,7 @@ For a video render, set `settings.video=true`; Blender's FFmpeg/H.264 support mu
 - MCP validates bounded counts, IDs, transforms, keyframes, colors, frame ranges and output dimensions.
 - The renderer reads only the selected manifest and writes into the caller-selected output directory.
 - No downloaded assets, copyrighted references, branded products, franchise characters or living-artist imitation are bundled. Use original, user-owned or properly licensed assets and retain provenance in the FORGE rights ledger.
-- The bridge now imports GLB/GLTF/FBX models and optional base-color image textures, alongside primitive-based scenes, basic materials, lights, one camera and transform animation. It does not yet support rigged-character retargeting, full PBR texture sets (normal/roughness/metallic maps), physics simulations, compositing nodes, audio, transitions between shots, progress/cancellation, remote rendering or studio preview handoff.
+- The bridge imports GLB/GLTF/FBX models and optional base-color image textures, alongside primitive-based scenes, basic materials, lights, one camera and transform animation. It can play Actions already embedded in an imported Armature, animate existing facial shape keys, and inspect an asset's available objects/rigs/actions without rendering. It does not yet support retargeting or generating new motion, full PBR texture sets (normal/roughness/metallic maps), physics simulations, compositing nodes, audio, transitions between shots, progress/cancellation, remote rendering or studio preview handoff.
 - The MCP validator and source syntax are static checks only. Blender has not been installed or executed, and no rendered output has been verified.
 
 
