@@ -167,3 +167,13 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - No arbitrary Python expressions, shell commands or user-supplied executable code are accepted in the declarative job. The MCP validator bounds object/material/light counts, transform vectors, IDs, keyframes and output dimensions.
 - This milestone does not yet import arbitrary 3D models or textures, rig characters, simulate physics, composite multiple shots, mix audio, report render progress, cancel jobs, upload outputs, or return a rendered preview to the studio.
 - Blender was not downloaded or installed; the runner was not executed; no render, browser test, CI test or Worker deployment was performed. This code milestone is not evidence that Blender is available in a runtime.
+
+
+### Blender bridge — model and texture import milestone
+
+- The Blender runner now accepts approved GLB/GLTF and FBX model assets through the declarative `imported_model` object type, while retaining the primitive object types.
+- Materials may reference one base-color image texture (PNG, JPG/JPEG, WebP, TIF/TIFF) through a relative `base_color_texture` path.
+- The MCP validator and browser editor reject absolute paths, traversal segments, hidden path segments and unsupported extensions. The local runner resolves every asset under an explicit assets root, rejects paths that escape that root, requires an existing file, and limits individual assets to 512 MiB.
+- The runner groups imported model objects under a transform root so Claude can position, rotate, scale and keyframe the imported asset as a shot element.
+- This is not full PBR yet: normal, roughness, metallic and displacement texture maps are not wired. Rig retargeting, character animation import/cleanup, physics, compositing, audio, multi-shot transitions, render queue, progress/cancel and studio preview handoff remain future work.
+- No model or texture was downloaded. No Blender install, execution, render, browser/CI test or Worker deployment was performed.
