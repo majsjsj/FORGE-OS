@@ -194,3 +194,10 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - Imported character meshes may animate existing Blender shape keys (blend shapes) through declarative per-key frame/value curves. A mesh target can be specified when the same key name exists on multiple meshes.
 - MCP and studio validation require an imported model, existing-style key names, ordered positive frame numbers, bounded values and limited directive/keyframe counts. At render time the runner resolves each requested key against the imported asset and fails if it is missing or ambiguous.
 - Claude controls the expression curve timing and values. This is not facial rig generation, emotion recognition, phoneme generation or automatic audio lip sync; the blend shapes must already exist in the original or authorized asset.
+
+
+### Blender asset capability inspection
+
+- The Blender runner now has a separate `--inspect-asset` mode for one GLB/GLTF/FBX file. It imports the asset into a fresh background Blender process and emits JSON describing imported object names/types, Armature bone names, mesh material names, existing shape keys, and embedded animation Actions with source frame ranges.
+- Inspection is explicitly non-rendering and does not create a video or still. It provides Claude with exact asset identifiers to use when authoring the subsequent manifest, reducing guesses about action, rig and facial-key names.
+- This is an executable local Blender CLI feature, not yet a remote MCP tool or hosted asset-inspection service. It requires Blender and the asset to be present on the machine running the command. No Blender install or inspection was run during this code change.
