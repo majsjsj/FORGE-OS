@@ -889,9 +889,82 @@ const TOOLS = [
       additionalProperties: false,
     },
   },
-];
 
-async function callTool(name, args, env) {
+  {
+    name: "forge_motion_plan_read",
+    description: "Read the latest Claude-directed FORGE MOTION production plan from FORGE_MOTION_PLAN.json on an isolated project branch. Read-only; returns the file SHA for safe updates.",
+    inputSchema: { type: "object", properties: {
+      project_path: { type: "string", description: "Project directory under workspace/, e.g. workspace/my-film." },
+      branch: { type: "string", description: "Existing forge/projects/ branch." }
+    }, required: ["project_path","branch"], additionalProperties: false }
+  },
+  {
+    name: "forge_motion_plan_save",
+    description: "Publish Claude's approved FORGE MOTION production plan to the project's FORGE_MOTION_PLAN.json. The studio polls this file and applies new plans automatically. Claude owns all creative timing decisions. Requires confirm=true; updating an existing plan requires expected_sha from forge_motion_plan_read. Writes only to an isolated project branch; no build or render is started.",
+    inputSchema: { type: "object", properties: {
+      project_path: { type: "string" },
+      branch: { type: "string" },
+      plan: { type: "object", description: "Version 1 plan with duration, clips, optional scenes, fps, aspectRatio, title and notes." },
+      expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+      confirm: { type: "boolean" }
+    }, required: ["project_path","branch","plan","confirm"], additionalProperties: false }
+  },
+];\n\nasync function callTool(name, args, env) {
+
+  if (name === "forge_motion_plan_read") {
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory below workspace/.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main" || !branch.startsWith("forge/projects/")) throw new Error("Motion plans require an isolated forge/projects/ branch.");
+    const path = projectPath + "/FORGE_MOTION_PLAN.json";
+    const file = await callTool("forge_workspace_read", { path, branch }, env);
+    let plan;
+    try { plan = JSON.parse(file.content); } catch { throw new Error("FORGE_MOTION_PLAN.json is not valid JSON."); }
+    return { plan, storage: { path, branch, sha: file.sha } };
+  }
+
+  if (name === "forge_motion_plan_save") {
+    if (args.confirm !== true) throw new Error("Motion plan not published: confirm=true is required after the user approves the production plan.");
+    const projectPath = validateWorkspacePath(args.project_path, true);
+    if (projectPath === "workspace") throw new Error("Choose a project directory below workspace/.");
+    const branch = validateProjectBranch(args.branch);
+    if (branch === "main" || !branch.startsWith("forge/projects/")) throw new Error("Motion plans can only be saved to an isolated forge/projects/ branch.");
+    const plan = args.plan;
+    if (!plan || typeof plan !== "object" || Array.isArray(plan) || plan.version !== 1 ||
+        !Number.isFinite(Number(plan.duration)) || Number(plan.duration) <= 0 || Number(plan.duration) > 86400 ||
+        !Array.isArray(plan.clips) || plan.clips.length > 500)
+      throw new Error("Plan must be version 1, have a positive duration (up to 24 hours), and contain at most 500 clips.");
+    const allowedTracks = new Set(["video","narration","music","sfx","captions","graphics"]);
+    for (let i=0;i<plan.clips.length;i++) {
+      const clip = plan.clips[i];
+      const start = Number(clip?.start), inside = Number(clip?.in ?? 0), outside = Number(clip?.out);
+      if (!clip || !allowedTracks.has(clip.type) || !Number.isFinite(start) || start < 0 ||
+          !Number.isFinite(inside) || inside < 0 || !Number.isFinite(outside) || outside <= inside ||
+          start + outside - inside > Number(plan.duration) + .05)
+        throw new Error("Invalid track or timing in clip " + (i+1) + "; every clip must fit within Claude's approved runtime.");
+    }
+    const content = JSON.stringify({ ...plan, updatedAt: new Date().toISOString(), approvedBy: "claude" }, null, 2);
+    if (new TextEncoder().encode(content).length > 256 * 1024) throw new Error("Motion plan exceeds 256 KiB.");
+    if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(content) ||
+        /(?:api[_-]?key|access[_-]?token|password|client[_-]?secret)"?\s*[:=]\s*"?[^\s"<>{}]{12,}/i.test(content))
+      throw new Error("Motion plan must not contain credentials or secret values.");
+    const path = projectPath + "/FORGE_MOTION_PLAN.json";
+    let current = null;
+    try { current = await callTool("forge_workspace_read", { path, branch }, env); }
+    catch (error) { if (!String(error?.message || error).includes("GitHub API 404")) throw error; }
+    if (current && !args.expected_sha) throw new Error("Existing motion plan requires expected_sha from forge_motion_plan_read.");
+    if (current && current.sha !== args.expected_sha) throw new Error("Stale motion plan; read the latest plan before updating.");
+    if (!current && args.expected_sha) throw new Error("expected_sha was supplied but no motion plan exists.");
+    const saved = await callTool("forge_workspace_write", {
+      path, branch, content,
+      ...(args.expected_sha ? { expected_sha: args.expected_sha } : {}),
+      confirm: true
+    }, env);
+    return { ...saved, project_path: projectPath, plan_version: 1, duration: Number(plan.duration),
+      clip_count: plan.clips.length, studio_sync: "polling endpoint", note: "Claude's approved production plan is committed. The studio can fetch it from GET /motion-plan?project=<project_path>&ref=<branch>. No render or build was started." };
+  }
+
+
   if (name === "forge_project_plan_read") {
     const target = validateProjectMemoryTarget(args.project_path, args.branch);
     const file = await callTool("forge_workspace_read", { path: target.path, branch: target.branch }, env);
@@ -1932,6 +2005,38 @@ export default {
       else if (lowerPath.endsWith(".gz")) headers.set("content-encoding", "gzip");
       return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
     }
+
+    if (url.pathname === "/motion-plan") {
+      const corsOrigin = "https://majsjsj.github.io";
+      const cors = { "access-control-allow-origin": corsOrigin, "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "content-type", "access-control-max-age": "86400",
+        "vary": "Origin", "cache-control": "no-store", "x-content-type-options": "nosniff" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      if (request.method !== "GET") return json({ error: "GET required." }, 405);
+      try {
+        const projectPath = validateWorkspacePath(url.searchParams.get("project"), true);
+        if (projectPath === "workspace") throw new Error("A project directory is required.");
+        const branch = validateProjectBranch(url.searchParams.get("ref"));
+        if (branch === "main" || !branch.startsWith("forge/projects/")) throw new Error("Motion plan reads require an isolated forge/projects/ branch.");
+        const path = projectPath + "/FORGE_MOTION_PLAN.json";
+        const file = await github(env, "contents/" + path.split("/").map(encodeURIComponent).join("/") + "?ref=" + encodeURIComponent(branch));
+        if (file.encoding !== "base64" || typeof file.content !== "string") throw new Error("Motion plan file is not available as UTF-8 text.");
+        const planText = decodeBase64Utf8(file.content);
+        const plan = JSON.parse(planText);
+        if (!plan || plan.version !== 1 || !Number.isFinite(Number(plan.duration)) || !Array.isArray(plan.clips))
+          throw new Error("Saved motion plan failed validation.");
+        return new Response(JSON.stringify({ plan, sha: file.sha, branch, project_path: projectPath }), {
+          headers: { ...cors, "content-type": "application/json; charset=utf-8" }
+        });
+      } catch (error) {
+        const message = String(error?.message || error);
+        const missing = message.includes("GitHub API 404");
+        return new Response(JSON.stringify({ error: missing ? "No published FORGE_MOTION_PLAN.json exists for this project yet." : message }), {
+          status: missing ? 404 : 400, headers: { ...cors, "content-type": "application/json; charset=utf-8" }
+        });
+      }
+    }
+
     if (!authorized(request, env)) return json({ error: "Unauthorized" }, 401);
     if (url.pathname === "/health" && request.method === "GET")
       return json({ ok: true, service: "FORGE Remote Controller" });
