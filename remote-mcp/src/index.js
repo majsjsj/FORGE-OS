@@ -891,6 +891,20 @@ const TOOLS = [
   },
 
   {
+    name: "forge_blender_job_validate",
+    description: "Validate a safe, declarative FORGE Blender scene manifest. This does not run Blender or render; it reports the exact background-render contract.",
+    inputSchema: { type: "object", properties: { job: { type: "object", description: "Version 1 declarative Blender job: settings, objects, materials, camera, lights and optional keyframes." } }, required: ["job"], additionalProperties: false }
+  },
+  {
+    name: "forge_blender_job_publish",
+    description: "Validate and save a Blender scene manifest as BLENDER_JOB.json on an isolated forge/projects/ branch. Claude directs all scene timing and shot decisions. Requires confirm=true. Saves a job only; it does not install Blender, start a render, or incur compute costs.",
+    inputSchema: { type: "object", properties: {
+      project_path: { type: "string" }, branch: { type: "string" },
+      job: { type: "object" }, expected_sha: { type: "string", pattern: "^[a-fA-F0-9]{40}$" },
+      confirm: { type: "boolean" }
+    }, required: ["project_path","branch","job","confirm"], additionalProperties: false }
+  },
+  {
     name: "forge_motion_plan_read",
     description: "Read the latest Claude-directed FORGE MOTION production plan from FORGE_MOTION_PLAN.json on an isolated project branch. Read-only; returns the file SHA for safe updates.",
     inputSchema: { type: "object", properties: {
@@ -911,7 +925,86 @@ const TOOLS = [
   },
 ];
 
+function validateBlenderJob(job) {
+  if (!job || typeof job !== "object" || Array.isArray(job) || job.version !== 1)
+    throw new Error("Blender job must be an object with version=1.");
+  const settings = job.settings || {};
+  const fps = Number(settings.fps ?? 24), width = Number(settings.width ?? 1920), height = Number(settings.height ?? 1080);
+  if (!Number.isInteger(fps) || fps < 1 || fps > 120 || !Number.isInteger(width) || !Number.isInteger(height) ||
+      width < 16 || height < 16 || width > 8192 || height > 8192)
+    throw new Error("Invalid render settings: fps 1-120 and dimensions 16-8192 are required.");
+  if (!Array.isArray(job.objects) || job.objects.length > 300) throw new Error("objects must be an array with at most 300 entries.");
+  if (job.materials !== undefined && (!Array.isArray(job.materials) || job.materials.length > 300)) throw new Error("materials must contain at most 300 entries.");
+  if (job.lights !== undefined && (!Array.isArray(job.lights) || job.lights.length > 100)) throw new Error("lights must contain at most 100 entries.");
+  const ids = new Set();
+  const checkVec = (v, label, max=100000) => {
+    if (!Array.isArray(v) || v.length !== 3 || v.some(n => !Number.isFinite(Number(n)) || Math.abs(Number(n)) > max))
+      throw new Error(label + " must be a finite three-number vector.");
+  };
+  for (const [i,m] of (job.materials || []).entries()) {
+    if (!m || typeof m.id !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(m.id) || ids.has("mat:"+m.id)) throw new Error("Invalid or duplicate material id at index " + i);
+    ids.add("mat:"+m.id);
+    if (m.color !== undefined && (!Array.isArray(m.color) || m.color.length !== 4 || m.color.some(n => !Number.isFinite(Number(n)) || Number(n)<0 || Number(n)>1))) throw new Error("Material color must be RGBA values from 0 to 1.");
+    if (m.roughness !== undefined && (!Number.isFinite(Number(m.roughness)) || Number(m.roughness)<0 || Number(m.roughness)>1)) throw new Error("Material roughness must be from 0 to 1.");
+    if (m.metallic !== undefined && (!Number.isFinite(Number(m.metallic)) || Number(m.metallic)<0 || Number(m.metallic)>1)) throw new Error("Material metallic must be from 0 to 1.");
+  }
+  const objectIds = new Set();
+  for (const [i,o] of job.objects.entries()) {
+    if (!o || typeof o.id !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(o.id) || objectIds.has(o.id)) throw new Error("Invalid or duplicate object id at index " + i);
+    objectIds.add(o.id);
+    if (!["cube","uv_sphere","cylinder","cone","plane","torus","monkey"].includes(o.type)) throw new Error("Unsupported primitive type at object " + o.id);
+    checkVec(o.location || [0,0,0], "Object location");
+    checkVec(o.rotation || [0,0,0], "Object rotation");
+    checkVec(o.scale || [1,1,1], "Object scale", 1000);
+    if ((o.scale || [1,1,1]).some(n => Number(n) <= 0)) throw new Error("Object scale values must be positive.");
+    if (o.material && !ids.has("mat:"+o.material)) throw new Error("Unknown material on object " + o.id);
+    if (o.keyframes !== undefined) {
+      if (!Array.isArray(o.keyframes) || o.keyframes.length > 200) throw new Error("Each object supports at most 200 keyframes.");
+      let last=-1;
+      for (const k of o.keyframes) {
+        if (!k || !Number.isInteger(Number(k.frame)) || Number(k.frame)<1 || Number(k.frame)<=last) throw new Error("Keyframes must use strictly increasing positive integer frames.");
+        last=Number(k.frame);
+        if (k.location) checkVec(k.location,"Keyframe location");
+        if (k.rotation) checkVec(k.rotation,"Keyframe rotation");
+        if (k.scale) checkVec(k.scale,"Keyframe scale",1000);
+      }
+    }
+  }
+  for (const l of job.lights || []) {
+    if (!l || !["POINT","SUN","SPOT","AREA"].includes(l.type)) throw new Error("Light type must be POINT, SUN, SPOT, or AREA.");
+    checkVec(l.location || [0,0,5], "Light location");
+    if (l.energy !== undefined && (!Number.isFinite(Number(l.energy)) || Number(l.energy)<0 || Number(l.energy)>10000000)) throw new Error("Light energy is out of range.");
+  }
+  const camera=job.camera || {};
+  if (camera.location) checkVec(camera.location,"Camera location");
+  if (camera.rotation) checkVec(camera.rotation,"Camera rotation");
+  const frameStart=Number(settings.frame_start ?? 1), frameEnd=Number(settings.frame_end ?? 120);
+  if (!Number.isInteger(frameStart)||!Number.isInteger(frameEnd)||frameStart<1||frameEnd<frameStart||frameEnd-frameStart>1000000)
+    throw new Error("Invalid frame range.");
+  return {version:1, objects:job.objects.length, materials:(job.materials||[]).length, lights:(job.lights||[]).length,
+    render:{engine:"BLENDER_EEVEE_NEXT",fps,width,height,frame_start:frameStart,frame_end:frameEnd},
+    output:"//forge-output/<job-name>.mp4 (FFmpeg configuration required)",
+    execution:"Run blender --background --python blender/forge_blender_bridge.py -- --job BLENDER_JOB.json --output ./renders",
+    side_effects:"Validation only; no Blender process or render is started."};
+}
+
 async function callTool(name, args, env) {
+  if (name === "forge_blender_job_validate") {
+    return { valid: true, ...validateBlenderJob(args.job) };
+  }
+
+  if (name === "forge_blender_job_publish") {
+    if (args.confirm !== true) throw new Error("Blender job not published: confirm=true is required after user approval.");
+    const projectPath=validateWorkspacePath(args.project_path,true);
+    if (projectPath==="workspace") throw new Error("Choose a project directory below workspace/.");
+    const branch=validateProjectBranch(args.branch);
+    if (branch==="main" || !branch.startsWith("forge/projects/")) throw new Error("Blender jobs can only be saved on isolated forge/projects/ branches.");
+    const report=validateBlenderJob(args.job);
+    const path=projectPath+"/BLENDER_JOB.json";
+    const saved=await callTool("forge_workspace_write",{path,branch,content:JSON.stringify(args.job,null,2),expected_sha:args.expected_sha,confirm:true},env);
+    return { ...saved, validation:report, rendered:false, blender_installed:false };
+  }
+
 
   if (name === "forge_motion_plan_read") {
     const projectPath = validateWorkspacePath(args.project_path, true);
