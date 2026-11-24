@@ -128,3 +128,10 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The Audio & Voice panel can split a user-provided transcript into ordered spoken units while preserving the exact text. This is transcript segmentation only; it does not infer word timestamps, speaker identity, emotion or audio semantics.
 - The director JSON handoff includes these units as `voiceSegments`. Claude can assign final start/end times, speaker labels and visual scene intent, then publish the approved production plan through MCP.
 - The Worker validates transcript unit count, text, optional speaker/scene intent, and optional paired timing within the approved runtime. Untimed segments remain untimed until Claude directs them. No duration is auto-assigned by the studio.
+
+
+## Claude visual story direction
+
+- The Storyboard panel now includes a read-only shot-by-shot direction sheet populated from the approved Claude MCP plan. It displays scene intent, shot size, camera move, lighting, transition, infographic/graphics direction, sound cue and optional voice-segment link.
+- Supported structured enums are validated by the Worker for shotType, cameraMove and transition. Descriptive direction fields are length-limited. Visual scenes are preserved with the approved director plan in the local multitrack project.
+- This is a director-plan viewer and metadata contract, not a new 3D renderer or AI video-generation backend. The existing motion-graphics renderer still supports its documented Canvas 2D scene vocabulary; other shot directions are instructions for future or external rendering engines.
