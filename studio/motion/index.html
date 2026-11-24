@@ -67,7 +67,27 @@
 <div class="bible-actions"><button id="cbExport" class="quiet">EXPORT CREATIVE BIBLE JSON</button><label class="upload compact-upload">IMPORT CREATIVE BIBLE<input id="cbImport" type="file" accept="application/json"></label><button id="cbClear" class="quiet">CLEAR LOCAL BIBLE</button></div>
 <p class="hint">The creative bible stays in this browser until exported or included in a Claude production-plan handoff. No reference images are copied from third parties.</p>
 </section>
-<div class="card visual-director-card"><div class="card-title">CLAUDE VISUAL STORY DIRECTION</div><p class="hint">The approved Claude plan appears here as a shot-by-shot visual direction sheet. Timing and scene count remain Claude decisions.</p><div id="directorVisualScenes" class="director-visual-scenes"><div class="empty">Waiting for Claude's visual scene plan.</div></div></div>
+
+<section class="card rights-ledger" id="assetRightsLedger">
+<div class="card-title">ORIGINAL ASSET RIGHTS & PROVENANCE LEDGER</div>
+<p class="hint">سجل مصدر كل أصل قبل استخدامه في الإنتاج. هذا سجل توثيقي داخلي وليس فحصًا قانونيًا أو تحققًا آليًا من الترخيص.</p>
+<div class="rights-notice">سياسة FORGE: استخدم أعمالك الأصلية أو أصولًا لديك إذن واضح باستخدامها. لا تستورد شخصيات أو شعارات أو أعمالًا محمية دون تصريح، ولا تفترض أن مجرد وجود أصل على الإنترنت يجعله مجانيًا.</div>
+<div class="rights-grid">
+<label>ASSET NAME<input id="arName" maxlength="120" placeholder="اسم الأصل"></label>
+<label>ASSET TYPE<select id="arType"><option value="character">Character</option><option value="environment">Environment</option><option value="prop">Prop / Object</option><option value="texture">Texture / Material</option><option value="audio">Audio / Music / SFX</option><option value="font">Font</option><option value="image">Image / Reference</option><option value="video">Video</option><option value="other">Other</option></select></label>
+<label>ORIGIN<select id="arOrigin"><option value="created_by_user">Created by me / my team</option><option value="generated">Generated for this project</option><option value="licensed">Licensed / permission granted</option><option value="public_domain">Public domain (evidence required)</option></select></label>
+<label>CREATOR / RIGHTS HOLDER<input id="arCreator" maxlength="160" placeholder="Creator or rights holder"></label>
+<label>SOURCE URL · OPTIONAL<input id="arUrl" maxlength="1000" type="url" placeholder="https://..."></label>
+<label>LICENSE / PERMISSION<input id="arLicense" maxlength="180" placeholder="License name or permission scope"></label>
+<label>ATTRIBUTION REQUIRED<input id="arAttribution" maxlength="300" placeholder="Required credit, or 'None stated'"></label>
+<label>PROOF / EVIDENCE NOTE<textarea id="arEvidence" maxlength="1200" rows="2" placeholder="Where is permission documented? Contract, receipt, email, license page..."></textarea></label>
+<label>INTERNAL NOTES<textarea id="arNotes" maxlength="1200" rows="2" placeholder="Restrictions, allowed uses, expiration, modifications..."></textarea></label>
+</div>
+<div class="row"><button id="arAdd" class="primary">＋ REGISTER ASSET</button><button id="arExport" class="quiet">EXPORT RIGHTS LEDGER JSON</button><label class="upload compact-upload">IMPORT LEDGER<input id="arImport" type="file" accept="application/json"></label><button id="arClear" class="quiet">CLEAR LEDGER</button></div>
+<div id="arStatus" class="hint" role="status">0 assets registered · stored locally in this browser</div>
+<div id="arItems" class="rights-items"><div class="empty">No assets registered yet.</div></div>
+</section>
+\n<div class="card visual-director-card"><div class="card-title">CLAUDE VISUAL STORY DIRECTION</div><p class="hint">The approved Claude plan appears here as a shot-by-shot visual direction sheet. Timing and scene count remain Claude decisions.</p><div id="directorVisualScenes" class="director-visual-scenes"><div class="empty">Waiting for Claude's visual scene plan.</div></div></div>
 </section>
 <section class="panel" id="panel-timeline">
 <div class="heading"><div><div class="eyebrow">EDIT & ASSEMBLE</div><h1>Timeline</h1><p>Arrange your shots and adjust their duration before the editing backend is connected.</p></div><div class="tag" id="totalDuration">0.0 SEC</div></div>
@@ -177,5 +197,5 @@
 <script src="motion-graphics.js"></script>
 <script src="multitrack.js"></script>
 <script src="director.js"></script>
-<script src="creative-bible.js"></script>
+<script src="creative-bible.js"></script>\n<script src="asset-rights.js"></script>
 </body></html>
