@@ -145,3 +145,11 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The library is stored in browser localStorage under `forge-motion-creative-bible-v1`; it supports JSON import/export and local removal. It is not uploaded automatically and contains no third-party reference-image downloader.
 - Production rule: use original/user-owned/licensed assets only. Do not reproduce protected franchise characters, logos, branded designs, existing artwork, or imitate a living artist. Broad technical descriptors (camera, lighting, medium, palette) should be described independently in original language.
 - This library is a continuity/specification tool, not an image generator or rights-clearance service. Users remain responsible for confirming permissions for any imported material.
+
+
+## Original asset rights and provenance ledger
+
+- Added a local-first ledger for asset name/type, origin, creator or rights holder, optional source URL, license or permission scope, attribution, evidence notes and internal restrictions.
+- Supported origin labels are user/team-created, generated for the project, licensed/permission-granted, and claimed public-domain. These are user-entered declarations, not independently verified statuses.
+- Ledger records are stored in this browser and can be exported/imported as JSON. They are not uploaded automatically or sent to a provider.
+- The ledger is documentation, not legal advice, automated copyright detection, license verification or a guarantee of commercial-use rights. Users must verify the actual license and retain supporting evidence before publication.
