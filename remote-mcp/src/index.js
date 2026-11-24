@@ -978,6 +978,9 @@ async function callTool(name, args, env) {
         const duration = Number(scene?.duration);
         if (!scene || !Number.isFinite(duration) || duration <= 0 || duration > 86400)
           throw new Error("Invalid Claude-selected duration in visual scene " + (index+1) + ".");
+        const enumFields = { shotType:["extreme-wide","wide","full","medium","close-up","extreme-close-up","overhead","pov","tracking","insert","aerial"], cameraMove:["static","push-in","pull-out","pan-left","pan-right","tilt-up","tilt-down","orbit","dolly","crane","handheld","tracking","zoom"], transition:["cut","fade","dissolve","wipe","zoom","match-cut","whip-pan","dip-to-black"] };
+        for (const [field, allowed] of Object.entries(enumFields)) if (scene[field] !== undefined && !allowed.includes(scene[field])) throw new Error("Unsupported " + field + " in visual scene " + (index+1) + ".");
+        for (const field of ["title","sceneIntent","description","action","lighting","graphics","soundCue","voiceSegmentId","lens","composition","colorMood"]) if (scene[field] !== undefined && (typeof scene[field] !== "string" || scene[field].length > 2000)) throw new Error("Invalid " + field + " in visual scene " + (index+1) + ".");
         if (scene.transitionDuration !== undefined && (!Number.isFinite(Number(scene.transitionDuration)) || Number(scene.transitionDuration) <= 0))
           throw new Error("Invalid transition duration in visual scene " + (index+1) + ".");
         return sum + duration;
