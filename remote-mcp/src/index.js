@@ -955,6 +955,27 @@ function validateBlenderJob(job) {
     objectIds.add(o.id);
     if (!["cube","uv_sphere","cylinder","cone","plane","torus","monkey","imported_model"].includes(o.type)) throw new Error("Unsupported primitive type at object " + o.id);
     if (o.type === "imported_model" && (typeof o.asset !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(o.asset) || o.asset.startsWith("/") || o.asset.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(glb|gltf|fbx)$/i.test(o.asset))) throw new Error("Imported models must use a safe relative .glb, .gltf or .fbx asset path.");
+    if (o.animation !== undefined) {
+      const a=o.animation;
+      if (o.type !== "imported_model" || !a || typeof a !== "object" || Array.isArray(a) ||
+          typeof a.action !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.action))
+        throw new Error("Animation requires an imported model and a valid existing action name.");
+      if (a.target !== undefined && (typeof a.target !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.target)))
+        throw new Error("Animation target must be an imported object name.");
+      if (a.track_name !== undefined && (typeof a.track_name !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.track_name)))
+        throw new Error("Animation track_name is invalid.");
+      const start=Number(a.start_frame), end=Number(a.end_frame);
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end <= start || end > 1000000)
+        throw new Error("Animation start_frame/end_frame must be an increasing positive frame range.");
+      for (const key of ["repeat","scale"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < (key==="repeat" ? 0.1 : 0.01) || Number(a[key]) > 100))
+        throw new Error("Animation " + key + " is out of range.");
+      for (const key of ["blend_in","blend_out"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < 0 || Number(a[key]) > 1000))
+        throw new Error("Animation " + key + " must be between 0 and 1000 frames.");
+      for (const key of ["action_start","action_end"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Math.abs(Number(a[key])) > 1000000))
+        throw new Error("Animation action frame bounds are invalid.");
+      if (a.action_start !== undefined && a.action_end !== undefined && Number(a.action_end) <= Number(a.action_start))
+        throw new Error("Animation action_end must be greater than action_start.");
+    }
     checkVec(o.location || [0,0,0], "Object location");
     checkVec(o.rotation || [0,0,0], "Object rotation");
     checkVec(o.scale || [1,1,1], "Object scale", 1000);
