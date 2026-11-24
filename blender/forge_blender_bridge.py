@@ -94,6 +94,30 @@ def import_model(item, assets_root):
     root.location = vec(item.get("location"), (0, 0, 0))
     root.rotation_euler = tuple(math.radians(x) for x in vec(item.get("rotation"), (0, 0, 0)))
     root.scale = vec(item.get("scale"), (1, 1, 1))
+    animation = item.get("animation")
+    if animation:
+        action = bpy.data.actions.get(animation["action"])
+        if action is None:
+            raise ValueError("Animation action was not found in the imported asset: %s" % animation["action"])
+        target_name = animation.get("target")
+        candidates = [obj for obj in imported if obj.type == "ARMATURE"]
+        if target_name:
+            candidates = [obj for obj in imported if obj.name == target_name]
+        target = next((obj for obj in candidates if obj.type == "ARMATURE"), None)
+        if target is None:
+            raise ValueError("No matching imported Armature was found for animation action: %s" % animation["action"])
+        if not target.animation_data:
+            target.animation_data_create()
+        track = target.animation_data.nla_tracks.new()
+        track.name = safe_name(animation.get("track_name"), "FORGE Action")
+        strip = track.strips.new(action.name, int(animation["start_frame"]), action)
+        strip.action_frame_start = float(animation.get("action_start", action.frame_range[0]))
+        strip.action_frame_end = float(animation.get("action_end", action.frame_range[1]))
+        strip.repeat = float(animation.get("repeat", 1.0))
+        strip.scale = float(animation.get("scale", 1.0))
+        strip.blend_in = float(animation.get("blend_in", 0.0))
+        strip.blend_out = float(animation.get("blend_out", 0.0))
+        strip.use_auto_blend = False
     return root, imported
 
 def create_scene(job, output_dir, assets_root):
