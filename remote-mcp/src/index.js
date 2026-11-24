@@ -954,6 +954,24 @@ async function callTool(name, args, env) {
         }
       }
     }
+    if (plan.voiceSegments !== undefined) {
+      if (!Array.isArray(plan.voiceSegments) || plan.voiceSegments.length > 1000)
+        throw new Error("voiceSegments must be an array with at most 1000 spoken units.");
+      for (let i=0;i<plan.voiceSegments.length;i++) {
+        const segment=plan.voiceSegments[i];
+        if (!segment || typeof segment.text !== "string" || !segment.text.trim() || segment.text.length > 2000)
+          throw new Error("Invalid transcript text in voice segment " + (i+1) + ".");
+        if (segment.speaker !== undefined && (typeof segment.speaker !== "string" || segment.speaker.length > 120))
+          throw new Error("Invalid speaker label in voice segment " + (i+1) + ".");
+        if (segment.start !== undefined || segment.end !== undefined) {
+          const start=Number(segment.start), end=Number(segment.end);
+          if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start || end > Number(plan.duration)+.05)
+            throw new Error("Invalid Claude-selected timing in voice segment " + (i+1) + ".");
+        }
+        if (segment.sceneIntent !== undefined && (typeof segment.sceneIntent !== "string" || segment.sceneIntent.length > 1000))
+          throw new Error("Invalid visual intent in voice segment " + (i+1) + ".");
+      }
+    }
     if (Array.isArray(plan.scenes)) {
       if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Visual scene list must contain 1 to 300 scenes.");
       const sceneTotal = plan.scenes.reduce((sum, scene, index) => {
