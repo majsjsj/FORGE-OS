@@ -81,7 +81,7 @@ Imported GLB/GLTF or FBX assets may include an Armature and animation Actions. A
     "start_frame": 1,
     "end_frame": 49,
     "repeat": 2,
-    "scale": 1,
+    "speed": 1,
     "blend_in": 4,
     "blend_out": 4
   }
