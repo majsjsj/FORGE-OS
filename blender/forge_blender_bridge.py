@@ -145,6 +145,53 @@ def import_model(item, assets_root):
         strip.use_auto_blend = False
     return root, imported
 
+
+def inspect_asset(relative_path, assets_root):
+    """Import one approved asset and report available rig/action/shape-key data; never render."""
+    path = asset_file(relative_path, assets_root, {".glb", ".gltf", ".fbx"})
+    before_objects = set(bpy.data.objects)
+    before_actions = set(bpy.data.actions)
+    extension = Path(path).suffix.lower()
+    if extension in (".glb", ".gltf"):
+        bpy.ops.import_scene.gltf(filepath=path)
+    elif extension == ".fbx":
+        bpy.ops.import_scene.fbx(filepath=path)
+    imported = [obj for obj in bpy.data.objects if obj not in before_objects]
+    actions = [action for action in bpy.data.actions if action not in before_actions]
+    object_report = []
+    for obj in imported:
+        entry = {"name": obj.name, "type": obj.type}
+        if obj.type == "ARMATURE" and obj.data:
+            entry["bones"] = [bone.name for bone in obj.data.bones][:1000]
+            entry["bone_count"] = len(obj.data.bones)
+        if obj.type == "MESH" and obj.data:
+            entry["vertices"] = len(obj.data.vertices)
+            entry["materials"] = [mat.name for mat in obj.data.materials if mat]
+            if obj.data.shape_keys:
+                entry["shape_keys"] = [key.name for key in obj.data.shape_keys.key_blocks if key.name != "Basis"][:500]
+        object_report.append(entry)
+    action_report = []
+    for action in actions:
+        action_report.append({
+            "name": action.name,
+            "frame_start": float(action.frame_range[0]),
+            "frame_end": float(action.frame_range[1]),
+            "duration_frames": float(action.frame_range[1] - action.frame_range[0]),
+            "users": int(action.users)
+        })
+    return {
+        "ok": True,
+        "asset": relative_path,
+        "format": extension.lstrip("."),
+        "object_count": len(imported),
+        "objects": object_report[:2000],
+        "actions": action_report[:500],
+        "armatures": sum(1 for obj in imported if obj.type == "ARMATURE"),
+        "mesh_count": sum(1 for obj in imported if obj.type == "MESH"),
+        "render_started": False
+    }
+
+
 def create_scene(job, output_dir, assets_root):
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
@@ -228,10 +275,16 @@ def create_scene(job, output_dir, assets_root):
 
 def main():
     parser = argparse.ArgumentParser(description="Render a FORGE MOTION Blender job")
-    parser.add_argument("--job", required=True, help="Path to a version-1 BLENDER_JOB.json")
+    parser.add_argument("--job", help="Path to a version-1 BLENDER_JOB.json")
+    parser.add_argument("--inspect-asset", help="Inspect one GLB/GLTF/FBX asset and report embedded rigs/actions/shape keys without rendering")
     parser.add_argument("--output", default="./renders", help="Output directory")
     parser.add_argument("--assets-root", default="./assets", help="Directory containing approved model and texture assets")
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
+    if args.inspect_asset:
+        print(json.dumps(inspect_asset(args.inspect_asset, args.assets_root), ensure_ascii=False))
+        return
+    if not args.job:
+        parser.error("provide --job to render or --inspect-asset to inspect an asset")
     with open(args.job, "r", encoding="utf-8") as handle:
         job = json.load(handle)
     if job.get("version") != 1:
