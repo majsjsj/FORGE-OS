@@ -74,7 +74,8 @@ c.fillStyle='#f4edff';c.beginPath();c.arc(0,-5,8,0,7);c.fill();c.restore();
 c.fillStyle='#e8eef8';c.font='bold 24px system-ui';c.textAlign='center';c.fillText($('cname').value||'Original character',640,650);c.font='14px system-ui';c.fillStyle='#91a1b8';c.fillText(importedImage?'IMPORTED ARTWORK PREVIEW':action.toUpperCase()+' · VECTOR RIG PREVIEW',640,680);
 if($('dialogue').value){c.font='bold 22px system-ui';c.fillStyle='#fff';c.textAlign='center';c.fillText($('dialogue').value.slice(0,90),640,610)}
 c.textAlign='left'}
-let customKeyframes=[];\nlet importedArtwork=null, importedImage=null, mouthCues=[];
+let customKeyframes=[];
+let importedArtwork=null, importedImage=null, mouthCues=[];
 function readPose(){return {armL:+$('jarmL').value,armR:+$('jarmR').value,legL:+$('jlegL').value,legR:+$('jlegR').value}}
 function sampleKeyframes(t){if(customKeyframes.length<2)return null;let x=((t%1)+1)%1*100;let a=customKeyframes[0],b=customKeyframes[customKeyframes.length-1];for(let i=0;i<customKeyframes.length-1;i++){if(x>=customKeyframes[i].at&&x<=customKeyframes[i+1].at){a=customKeyframes[i];b=customKeyframes[i+1];break}}let q=b.at===a.at?0:(x-a.at)/(b.at-a.at);q=Math.max(0,Math.min(1,q));return {armL:a.pose.armL+(b.pose.armL-a.pose.armL)*q,armR:a.pose.armR+(b.pose.armR-a.pose.armR)*q,legL:a.pose.legL+(b.pose.legL-a.pose.legL)*q,legR:a.pose.legR+(b.pose.legR-a.pose.legR)*q}}
 function renderKeyframes(){let host=$('ctimeline');host.innerHTML='';if(!customKeyframes.length){host.innerHTML='<span class="hint">No custom keyframes yet. Adjust joints and add a pose.</span>'}customKeyframes.forEach((k,i)=>{let b=document.createElement('button');b.className='clip';b.textContent='Pose '+(i+1)+' · '+k.at+'%';b.onclick=()=>{Object.entries(k.pose).forEach(([key,val])=>{let id={armL:'jarmL',armR:'jarmR',legL:'jlegL',legR:'jlegR'}[key];$(id).value=val});drawCharacter(0)};host.appendChild(b)});$('keyframeInfo').textContent=customKeyframes.length+' custom keyframes · interpolated across the clip duration.'}
@@ -93,7 +94,8 @@ function renderMouthCues(){ $('mouthInfo').textContent=mouthCues.length+' mouth 
 $('addMouthCue').onclick=()=>{let at=mouthCues.length?Math.min(100,mouthCues[mouthCues.length-1].at+Math.max(5,Math.round(100/(mouthCues.length+1)))):0;mouthCues.push({at,pose:$('mouthPose').value});renderMouthCues();$('status').textContent='Mouth cue added at '+at+'%';};
 $('clearMouthCues').onclick=()=>{mouthCues=[];renderMouthCues()};
 function activeMouthCue(t){if(!mouthCues.length)return;let pct=((t%1)+1)%1*100,found=mouthCues[0];for(const cue of mouthCues){if(cue.at<=pct)found=cue;else break}return found?.pose}
-\nconst keys=['Contact','Passing','High point','Passing'];fillTimeline('ctimeline',keys);
+
+const keys=['Contact','Passing','High point','Passing'];fillTimeline('ctimeline',keys);
 function cLoop(now){if(!cRunning)return;let t=(now-cStart)/1000,d=Math.max(2,Math.min(30,+$('cduration').value||6));drawCharacter((t%d)/d);cRAF=requestAnimationFrame(cLoop)}
 $('cplay').onclick=()=>{cRunning=!cRunning;if(cRunning){cStart=performance.now();$('cplay').textContent='Ⅱ Pause';cRAF=requestAnimationFrame(cLoop)}else{$('cplay').textContent='▶ Play';cancelAnimationFrame(cRAF)}};
 $('creset').onclick=()=>{cRunning=false;cancelAnimationFrame(cRAF);$('cplay').textContent='▶ Play';drawCharacter(0)};
