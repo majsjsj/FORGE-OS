@@ -29,11 +29,13 @@
     for (const m of job.materials || []) {
       if (!m || typeof m.id !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(m.id) || ids.has(m.id)) throw new Error("Invalid or duplicate material id.");
       ids.add(m.id);
+      if (m.base_color_texture !== undefined && (typeof m.base_color_texture !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(m.base_color_texture) || m.base_color_texture.startsWith("/") || m.base_color_texture.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(png|jpe?g|webp|tif?f)$/i.test(m.base_color_texture))) throw new Error("Texture path must be a safe relative image path.");
     }
     for (const o of job.objects) {
       if (!o || typeof o.id !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(o.id) || objectIds.has(o.id)) throw new Error("Invalid or duplicate object id.");
       objectIds.add(o.id);
-      if (!["cube", "uv_sphere", "cylinder", "cone", "plane", "torus", "monkey"].includes(o.type)) throw new Error("Unsupported object primitive: " + o.type);
+      if (!["cube", "uv_sphere", "cylinder", "cone", "plane", "torus", "monkey", "imported_model"].includes(o.type)) throw new Error("Unsupported object type: " + o.type);
+      if (o.type === "imported_model" && (typeof o.asset !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(o.asset) || o.asset.startsWith("/") || o.asset.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(glb|gltf|fbx)$/i.test(o.asset))) throw new Error("Model must use a safe relative GLB, GLTF or FBX asset path.");
       for (const field of ["location", "rotation", "scale"]) if (o[field] !== undefined && !vector(o[field])) throw new Error("Invalid " + field + " vector on " + o.id);
       if (o.material && !ids.has(o.material)) throw new Error("Unknown material reference on " + o.id);
       if (o.keyframes !== undefined) {
