@@ -187,3 +187,10 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The runner fails clearly if the named Action or matching Armature is absent. It does not fabricate missing animation data.
 - This is playback of animation already embedded in a user-provided or licensed asset. It is not motion retargeting, animation generation, facial animation, lip sync, inverse kinematics or motion capture.
 - Static source checks only; no Blender installation, asset download, Blender execution, render, browser test, CI run or Worker deployment was performed.
+
+
+### Facial shape-key animation
+
+- Imported character meshes may animate existing Blender shape keys (blend shapes) through declarative per-key frame/value curves. A mesh target can be specified when the same key name exists on multiple meshes.
+- MCP and studio validation require an imported model, existing-style key names, ordered positive frame numbers, bounded values and limited directive/keyframe counts. At render time the runner resolves each requested key against the imported asset and fails if it is missing or ambiguous.
+- Claude controls the expression curve timing and values. This is not facial rig generation, emotion recognition, phoneme generation or automatic audio lip sync; the blend shapes must already exist in the original or authorized asset.
