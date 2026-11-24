@@ -26,3 +26,5 @@
 .mt-word-cue i{font-style:normal;opacity:.8}.mt-word-cue i.active{color:#ffe36e;opacity:1;text-shadow:0 0 14px rgba(255,227,110,.4)}
 
 .mt-waveform{display:block;width:100%;height:auto;max-height:170px;margin:14px 0;background:#10131b;border:1px solid var(--line);border-radius:10px}.mt-analysis{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}.mt-analysis>div{padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:9px}.mt-analysis b,.mt-analysis small{display:block}.mt-analysis b{font-size:17px}.mt-analysis small{font-size:9px;color:var(--muted);margin-top:5px;letter-spacing:.06em}
+
+.mt-voice-segments{display:grid;gap:8px;margin-top:12px}.mt-voice-segment{display:grid;grid-template-columns:95px 1fr;gap:6px 12px;padding:11px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}.mt-voice-segment b,.mt-voice-segment small{font-size:9px;color:var(--muted);letter-spacing:.06em}.mt-voice-segment span{font-size:12px;line-height:1.5}.mt-voice-segment small{grid-column:2}
