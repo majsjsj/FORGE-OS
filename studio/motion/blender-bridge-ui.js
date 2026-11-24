@@ -48,6 +48,20 @@
         for (const key of ["action_start", "action_end"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Math.abs(Number(a[key])) > 1000000)) throw new Error("Animation source frame bounds are invalid.");
         if (a.action_start !== undefined && a.action_end !== undefined && Number(a.action_end) <= Number(a.action_start)) throw new Error("Animation action_end must be greater than action_start.");
       }
+      if (o.shape_keys !== undefined) {
+        if (o.type !== "imported_model" || !Array.isArray(o.shape_keys) || o.shape_keys.length > 100) throw new Error("Shape keys require an imported model and at most 100 directives.");
+        for (const shape of o.shape_keys) {
+          if (!shape || typeof shape.key !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(shape.key)) throw new Error("Invalid shape key name.");
+          if (shape.target !== undefined && (typeof shape.target !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(shape.target))) throw new Error("Invalid shape key mesh target.");
+          if (!Array.isArray(shape.keyframes) || shape.keyframes.length < 1 || shape.keyframes.length > 500) throw new Error("Each shape key needs 1 to 500 keyframes.");
+          let prior = 0;
+          for (const point of shape.keyframes) {
+            const frame = Number(point?.frame), value = Number(point?.value);
+            if (!Number.isInteger(frame) || frame < 1 || frame <= prior || !Number.isFinite(value) || value < -1 || value > 1) throw new Error("Shape key frames must be ordered and values must be between -1 and 1.");
+            prior = frame;
+          }
+        }
+      }
       for (const field of ["location", "rotation", "scale"]) if (o[field] !== undefined && !vector(o[field])) throw new Error("Invalid " + field + " vector on " + o.id);
       if (o.material && !ids.has(o.material)) throw new Error("Unknown material reference on " + o.id);
       if (o.keyframes !== undefined) {
