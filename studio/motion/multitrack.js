@@ -12,7 +12,7 @@ function applyDirectorPlan(plan){
  if(!Array.isArray(plan.clips))throw Error("Director plan must include a clips array.");
  const allowed=new Set(lanes.map(x=>x[0]));
  const next=plan.clips.map((c,i)=>{if(!allowed.has(c.type))throw Error("Unsupported track type in clip "+(i+1));const start=Math.max(0,Number(c.start)||0),inside=Math.max(0,Number(c.in)||0),outside=Number(c.out);if(!Number.isFinite(outside)||outside<=inside)throw Error("Invalid trim range in clip "+(i+1));if(start+outside-inside>Number(plan.duration)+.05)throw Error("Clip exceeds director-approved runtime.");return {...c,id:c.id||id(),name:String(c.name||c.text||("Director clip "+(i+1))),start,in:inside,out:outside,duration:outside-inside,volume:Math.max(0,Math.min(1,Number(c.volume??1))),fadeIn:Math.max(0,Number(c.fadeIn)||0),fadeOut:Math.max(0,Number(c.fadeOut)||0),url:null,file:null};});
- directorPlan={version:1,duration:Number(plan.duration),fps:Number(plan.fps)||30,aspectRatio:plan.aspectRatio||"16:9",approvedBy:"claude",title:plan.title||"Claude-directed production",notes:plan.notes||"",updatedAt:new Date().toISOString()};
+ directorPlan={version:1,duration:Number(plan.duration),fps:Number(plan.fps)||30,aspectRatio:plan.aspectRatio||"16:9",approvedBy:"claude",title:plan.title||"Claude-directed production",notes:plan.notes||"",voiceSegments:Array.isArray(plan.voiceSegments)?plan.voiceSegments:[],audioAnalysis:Array.isArray(plan.audioAnalysis)?plan.audioAnalysis:[],updatedAt:new Date().toISOString()};
  clips=next;selected=clips[0]?.id||null;head=0;render();return {ok:true,duration:directorPlan.duration,clips:clips.length};
 }
 function clearDirectorPlan(){directorPlan=null;render();}
