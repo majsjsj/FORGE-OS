@@ -1,0 +1,9 @@
+(()=>{"use strict";
+const $=id=>document.getElementById(id);
+const api=()=>window.ForgeMotionMultitrack;
+function download(data,name){const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+function report(message,error=false){const el=$("directorStatus");if(el){el.textContent=message;el.style.color=error?"#ff9b9b":"";}}
+$("directorPlanFile")?.addEventListener("change",async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;try{const plan=JSON.parse(await file.text());const result=api()?.applyDirectorPlan(plan);if(!result?.ok)throw Error("Director API unavailable.");report((plan.title||"Claude plan")+" · "+result.clips+" clips · "+result.duration+" sec");}catch(err){report("Plan rejected · "+err.message,true);}});
+$("directorExportPlan")?.addEventListener("click",()=>{const data=api()?.exportData?.();if(!data){report("Timeline API unavailable.",true);return;}const clips=(data.clips||[]).map(({id,assetId,url,file,...c})=>c);const duration=Math.max(0,...clips.map(c=>(Number(c.start)||0)+Math.max(0,Number(c.out??c.duration??0)-Number(c.in||0))));const plan={version:1,title:"FORGE MOTION timeline handoff",duration:Math.max(1,duration),fps:30,aspectRatio:"16:9",clips,notes:"Review and revise this plan in Claude. Claude is the authority for final timings."};download(plan,"forge-motion-director-plan.json");report("Director handoff exported · ready for Claude review.");});
+$("directorClearPlan")?.addEventListener("click",()=>{api()?.clearDirectorPlan?.();report("Director plan cleared · local timeline mode.");});
+})();
