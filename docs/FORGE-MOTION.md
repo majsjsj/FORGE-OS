@@ -42,7 +42,7 @@ Subtitle cue timing follows the media player's playback clock. Imported SRT/VTT 
 
 ## Not yet implemented or verified
 
-The UI does not itself provide AI transcription, generated video, Blender rendering, 2D/3D character animation, a multitrack compositor, audio-mixed final export, or final MP4 export. The motion-graphics canvas is a real local 2D renderer with WebM recording, not an AI video generator or 3D engine. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
+The UI does not itself provide AI transcription, generated video, a deployed Blender render service, generated or retargeted 2D/3D character motion, a complete multitrack compositor, audio-mixed final export, or final MP4 export. The Blender source runner supports explicitly supplied 3D assets, their embedded Actions and existing facial shape keys, but it has not been executed in a Blender runtime. The motion-graphics canvas is a real local 2D renderer with WebM recording, not an AI video generator or 3D engine. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
 
 ## Multitrack editor milestone
 
@@ -165,7 +165,7 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The first runner builds allowlisted primitive meshes, Principled BSDF materials, a camera, supported lights and transform keyframes. It can render a still or an H.264 MP4 when the installed Blender build includes FFmpeg support.
 - Claude remains the director: it chooses shot structure, frame range, frame rate, camera moves and keyframe timing. The sample manifest is only a starter example, not a creative timing limit.
 - No arbitrary Python expressions, shell commands or user-supplied executable code are accepted in the declarative job. The MCP validator bounds object/material/light counts, transform vectors, IDs, keyframes and output dimensions.
-- This milestone does not yet import arbitrary 3D models or textures, rig characters, simulate physics, composite multiple shots, mix audio, report render progress, cancel jobs, upload outputs, or return a rendered preview to the studio.
+- At this initial milestone, model/texture import and existing rig-action/shape-key playback are covered by later additions below. Full rig retargeting, generated character motion, physics simulation, multi-shot compositing, audio mixing, render progress/cancellation, output upload and studio preview handoff are not implemented.
 - Blender was not downloaded or installed; the runner was not executed; no render, browser test, CI test or Worker deployment was performed. This code milestone is not evidence that Blender is available in a runtime.
 
 
@@ -175,7 +175,7 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - Materials may reference one base-color image texture (PNG, JPG/JPEG, WebP, TIF/TIFF) through a relative `base_color_texture` path.
 - The MCP validator and browser editor reject absolute paths, traversal segments, hidden path segments and unsupported extensions. The local runner resolves every asset under an explicit assets root, rejects paths that escape that root, requires an existing file, and limits individual assets to 512 MiB.
 - The runner groups imported model objects under a transform root so Claude can position, rotate, scale and keyframe the imported asset as a shot element.
-- This is not full PBR yet: normal, roughness, metallic and displacement texture maps are not wired. Rig retargeting, character animation import/cleanup, physics, compositing, audio, multi-shot transitions, render queue, progress/cancel and studio preview handoff remain future work.
+- This is not full PBR yet: normal, roughness, metallic and displacement texture maps are not wired. Rig retargeting, animation cleanup/retiming beyond the declared NLA controls, physics, compositing, audio, multi-shot transitions, render queue, progress/cancel and studio preview handoff remain future work.
 - No model or texture was downloaded. No Blender install, execution, render, browser/CI test or Worker deployment was performed.
 
 
