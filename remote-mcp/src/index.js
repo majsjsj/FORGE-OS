@@ -976,6 +976,25 @@ function validateBlenderJob(job) {
       if (a.action_start !== undefined && a.action_end !== undefined && Number(a.action_end) <= Number(a.action_start))
         throw new Error("Animation action_end must be greater than action_start.");
     }
+    if (o.shape_keys !== undefined) {
+      if (o.type !== "imported_model" || !Array.isArray(o.shape_keys) || o.shape_keys.length > 100)
+        throw new Error("shape_keys requires an imported model and at most 100 directives.");
+      for (const [si,shape] of o.shape_keys.entries()) {
+        if (!shape || typeof shape.key !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(shape.key))
+          throw new Error("Invalid shape key name at directive " + (si+1) + ".");
+        if (shape.target !== undefined && (typeof shape.target !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(shape.target)))
+          throw new Error("Invalid shape key mesh target at directive " + (si+1) + ".");
+        if (!Array.isArray(shape.keyframes) || shape.keyframes.length < 1 || shape.keyframes.length > 500)
+          throw new Error("Each shape key needs 1 to 500 keyframes.");
+        let previous=0;
+        for (const point of shape.keyframes) {
+          const frame=Number(point?.frame), value=Number(point?.value);
+          if (!Number.isInteger(frame) || frame < 1 || frame <= previous || !Number.isFinite(value) || value < -1 || value > 1)
+            throw new Error("Shape key frames must be strictly increasing and values must be between -1 and 1.");
+          previous=frame;
+        }
+      }
+    }
     checkVec(o.location || [0,0,0], "Object location");
     checkVec(o.rotation || [0,0,0], "Object rotation");
     checkVec(o.scale || [1,1,1], "Object scale", 1000);
