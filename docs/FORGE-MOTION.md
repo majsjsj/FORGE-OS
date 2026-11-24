@@ -177,3 +177,13 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The runner groups imported model objects under a transform root so Claude can position, rotate, scale and keyframe the imported asset as a shot element.
 - This is not full PBR yet: normal, roughness, metallic and displacement texture maps are not wired. Rig retargeting, character animation import/cleanup, physics, compositing, audio, multi-shot transitions, render queue, progress/cancel and studio preview handoff remain future work.
 - No model or texture was downloaded. No Blender install, execution, render, browser/CI test or Worker deployment was performed.
+
+
+### Rigged character action playback — manifest milestone
+
+- Imported GLB/GLTF and FBX models can now optionally select an existing Blender animation Action by exact name and schedule it as an NLA strip on an imported Armature.
+- The manifest supports an optional Armature target name, NLA track label, scene start/end frame, action source-frame bounds, repeat count, time scale and blend-in/out frame values. Claude supplies these values; no fixed creative duration or automatic walk/run timing is imposed.
+- MCP validation restricts the feature to imported models, validates action/target names and numeric frame controls, and rejects invalid ranges before publishing.
+- The runner fails clearly if the named Action or matching Armature is absent. It does not fabricate missing animation data.
+- This is playback of animation already embedded in a user-provided or licensed asset. It is not motion retargeting, animation generation, facial animation, lip sync, inverse kinematics or motion capture.
+- Static source checks only; no Blender installation, asset download, Blender execution, render, browser test, CI run or Worker deployment was performed.
