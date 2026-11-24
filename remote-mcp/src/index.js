@@ -944,6 +944,15 @@ async function callTool(name, args, env) {
           !Number.isFinite(inside) || inside < 0 || !Number.isFinite(outside) || outside <= inside ||
           start + outside - inside > Number(plan.duration) + .05)
         throw new Error("Invalid track or timing in clip " + (i+1) + "; every clip must fit within Claude's approved runtime.");
+      if (clip.words !== undefined) {
+        if (clip.type !== "captions" || !Array.isArray(clip.words) || clip.words.length > 5000) throw new Error("Word timing is supported only as a captions clip with at most 5000 words (clip " + (i+1) + ").");
+        let previousEnd = 0;
+        for (let wi=0;wi<clip.words.length;wi++) {
+          const word=clip.words[wi], ws=Number(word?.start), we=Number(word?.end);
+          if (!word || typeof word.text !== "string" || !word.text.trim() || word.text.length > 200 || !Number.isFinite(ws) || !Number.isFinite(we) || ws < previousEnd || we <= ws || we > outside-inside + .05) throw new Error("Invalid or overlapping word timing in caption clip " + (i+1) + ", word " + (wi+1) + ".");
+          previousEnd=we;
+        }
+      }
     }
     if (Array.isArray(plan.scenes)) {
       if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Visual scene list must contain 1 to 300 scenes.");
@@ -2038,6 +2047,17 @@ export default {
         if (file.encoding !== "base64" || typeof file.content !== "string") throw new Error("Motion plan file is not available as UTF-8 text.");
         const planText = decodeBase64Utf8(file.content);
         const plan = JSON.parse(planText);
+        for (const clip of plan.clips || []) {
+            if (clip.words !== undefined) {
+              if (clip.type !== "captions" || !Array.isArray(clip.words) || clip.words.length > 5000) throw new Error("Saved word-level captions are invalid.");
+              let previousEnd=0;
+              for (const word of clip.words) {
+                const ws=Number(word?.start),we=Number(word?.end);
+                if (!word || typeof word.text!=="string" || !word.text.trim() || !Number.isFinite(ws) || !Number.isFinite(we) || ws<previousEnd || we<=ws || we>Number(clip.out)-Number(clip.in||0)+.05) throw new Error("Saved word-level caption timing is invalid.");
+                previousEnd=we;
+              }
+            }
+        }
         if (!plan || plan.version !== 1 || !Number.isFinite(Number(plan.duration)) || !Array.isArray(plan.clips))
           throw new Error("Saved motion plan failed validation.");
         if (Array.isArray(plan.scenes)) {
