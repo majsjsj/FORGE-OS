@@ -90,7 +90,37 @@ async function exportMixdown(){
   renderTick(performance.now());
  }catch(err){if(recorder&&recorder.state!=="inactive")recorder.stop();else{audioCtx.close();button.disabled=false;}setStatus("Export error: "+err.message);}
 }
+async function analyzeSelectedAudio(){
+ const status=$("mtAnalysisStatus"),canvas=$("mtWaveform"),panel=$("mtAudioAnalysis"),button=$("mtAnalyzeAudio");
+ const clip=clips.find(c=>c.id===selected),asset=clip?assets.find(a=>a.id===clip.assetId):null;
+ const file=clip?.file||asset?.file;
+ if(!clip||!["narration","music","sfx"].includes(clip.type)||!file){status.textContent="SELECT AN AUDIO CLIP";panel.textContent="Choose a narration, music or SFX clip with its media linked in this browser.";return;}
+ button.disabled=true;status.textContent="DECODING AUDIO…";
+ try{
+  const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(!AudioContextClass)throw Error("Web Audio is unavailable in this browser.");
+  const ctx=new AudioContextClass();let buffer;
+  try{buffer=await ctx.decodeAudioData(await file.arrayBuffer());}finally{await ctx.close();}
+  const channelCount=buffer.numberOfChannels,samples=buffer.length,sampleRate=buffer.sampleRate,duration=buffer.duration;
+  const mono=new Float32Array(samples);for(let ch=0;ch<channelCount;ch++){const data=buffer.getChannelData(ch);for(let i=0;i<samples;i++)mono[i]+=data[i]/channelCount;}
+  const bins=240,wave=new Array(bins);for(let b=0;b<bins;b++){const start=Math.floor(b*samples/bins),end=Math.max(start+1,Math.floor((b+1)*samples/bins));let peak=0,sum=0;for(let i=start;i<end;i++){const v=Math.abs(mono[i]);if(v>peak)peak=v;sum+=mono[i]*mono[i];}wave[b]={peak,rms:Math.sqrt(sum/Math.max(1,end-start))};}
+  const frameSize=1024,hop=512,energy=[];for(let start=0;start+frameSize<samples;start+=hop){let sum=0;for(let j=0;j<frameSize;j++){const v=mono[start+j];sum+=v*v;}energy.push(Math.sqrt(sum/frameSize));}
+  const flux=energy.map((v,i)=>Math.max(0,v-(energy[i-1]||0))),mean=flux.reduce((a,b)=>a+b,0)/Math.max(1,flux.length),variance=flux.reduce((a,b)=>a+(b-mean)**2,0)/Math.max(1,flux.length),sd=Math.sqrt(variance),threshold=mean+sd*.8;
+  const minGap=Math.max(1,Math.round(.22*sampleRate/hop)),peaks=[];let lastPeak=-minGap;
+  for(let i=1;i<flux.length-1;i++){if(flux[i]>threshold&&flux[i]>=flux[i-1]&&flux[i]>flux[i+1]&&i-lastPeak>=minGap){peaks.push(i*hop/sampleRate);lastPeak=i;}}
+  const onsetRate=sampleRate/hop;let bestLag=0,bestScore=0,secondScore=0;
+  for(let bpm=60;bpm<=180;bpm++){const lag=Math.round(onsetRate*60/bpm);if(lag<1||lag>=flux.length/2)continue;let score=0,n=0;for(let i=lag;i<flux.length;i++){score+=flux[i]*flux[i-lag];n++;}score/=Math.max(1,n);if(score>bestScore){secondScore=bestScore;bestScore=score;bestLag=lag;}else if(score>secondScore)secondScore=score;}
+  const bpm=bestLag?Math.round(onsetRate*60/bestLag):null,confidence=bestScore>0?Math.max(0,Math.min(1,(bestScore-secondScore)/bestScore)):0;
+  const maxEnergy=Math.max(0,...energy),silenceThreshold=Math.max(.003,maxEnergy*.12),segments=[];let activeStart=null;
+  for(let i=0;i<energy.length;i++){const t=i*hop/sampleRate,active=energy[i]>silenceThreshold;if(active&&activeStart===null)activeStart=t;if((!active||i===energy.length-1)&&activeStart!==null){const endTime=active?t:Math.min(duration,t);if(endTime-activeStart>=.18)segments.push({start:Number(activeStart.toFixed(3)),end:Number(endTime.toFixed(3))});activeStart=null;}}
+  const analysis={version:1,kind:"local-audio-signal-analysis",duration:Number(duration.toFixed(3)),sampleRate,channels:channelCount,peak:Number(Math.max(...wave.map(x=>x.peak)).toFixed(4)),rms:Number(Math.sqrt(wave.reduce((a,x)=>a+x.rms*x.rms,0)/wave.length).toFixed(4)),estimatedBpm:bpm,bpmConfidence:Number(confidence.toFixed(3)),onsets:peaks.slice(0,500).map(x=>Number(x.toFixed(3))),activeSegments:segments.slice(0,500),waveform:wave.map(x=>Number(x.peak.toFixed(3))),method:"mono RMS envelope + positive spectral-free energy flux; BPM is heuristic, not beat tracking"};
+  asset.analysis=analysis;clip.analysis=analysis;
+  const c=canvas.getContext("2d");c.clearRect(0,0,canvas.width,canvas.height);c.strokeStyle="#8d7cff";c.lineWidth=2;c.beginPath();for(let i=0;i<wave.length;i++){const x=i/(wave.length-1)*canvas.width,h=wave[i].peak*72;c.moveTo(x,85-h);c.lineTo(x,85+h);}c.stroke();c.strokeStyle="rgba(255,255,255,.16)";c.beginPath();c.moveTo(0,85);c.lineTo(canvas.width,85);c.stroke();c.fillStyle="#9ea6b7";c.font="12px sans-serif";c.fillText("0:00",8,160);c.fillText(duration.toFixed(1)+" sec",canvas.width-90,160);
+  panel.innerHTML='<div><b>'+duration.toFixed(2)+' sec</b><small>DURATION</small></div><div><b>'+(bpm?bpm+" BPM":"Not detected")+'</b><small>ESTIMATED TEMPO · '+Math.round(confidence*100)+'% RELATIVE CONFIDENCE</small></div><div><b>'+peaks.length+'</b><small>ONSET CANDIDATES</small></div><div><b>'+segments.length+'</b><small>ACTIVE REGIONS</small></div><div><b>'+analysis.rms+'</b><small>AVERAGE RMS</small></div>';
+  status.textContent="ANALYSIS READY";save();
+ }catch(err){status.textContent="ANALYSIS FAILED";panel.textContent=err.message;}finally{button.disabled=false;}
+}
 $("mtExport").addEventListener("click",exportMixdown);
+$("mtAnalyzeAudio").addEventListener("click",analyzeSelectedAudio);
 $("mtStop").addEventListener("click",()=>{pause();head=0;render();});
 document.querySelectorAll(".nav").forEach(b=>{if(b.dataset.panel==="multitrack")b.addEventListener("click",render);});
 try{const p=JSON.parse(localStorage.getItem(KEY)||"null");if(p?.multitrack)importData(p.multitrack);else render();}catch(e){render();}
