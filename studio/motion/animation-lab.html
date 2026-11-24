@@ -40,15 +40,16 @@ if(action==='wave'){bob=Math.sin(t*5)*5;armR=-2.6+Math.sin(t*7)*.45;legL=.08;leg
 if(action==='idle'){bob=Math.sin(t*2.5)*4;armL=Math.sin(t*1.7)*.06;armR=-armL}
 const kf=sampleKeyframes(t);if(kf){armL=kf.armL;armR=kf.armR;legL=kf.legL;legR=kf.legR}return {bob,armL:+$('jarmL').value+armL,armR:+$('jarmR').value+armR,legL:+$('jlegL').value+legL,legR:+$('jlegR').value+legR,tilt}}
 function limb(ctx,x,y,len,angle,width,color){ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,len);ctx.stroke();ctx.fillStyle=color;ctx.beginPath();ctx.arc(0,len,7,0,7);ctx.fill();ctx.restore()}
+function articulatedLimb(ctx,x,y,upper,lower,angle,bend,width,color){ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,upper);ctx.stroke();ctx.translate(0,upper);ctx.fillStyle='#f2c9a5';ctx.beginPath();ctx.arc(0,0,width*.34,0,7);ctx.fill();ctx.rotate(bend);ctx.strokeStyle=color;ctx.lineWidth=width*.78;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,lower);ctx.stroke();ctx.translate(0,lower);ctx.fillStyle=color;ctx.beginPath();ctx.arc(0,0,width*.43,0,7);ctx.fill();ctx.restore()}
 function drawCharacter(t){let W=1280,H=720,action=$('caction').value,scale=+$('cscale').value,color=$('cbody').value,P=pose(action,t);c.fillStyle='#101827';c.fillRect(0,0,W,H);let grad=c.createLinearGradient(0,0,0,H);grad.addColorStop(0,'#17253a');grad.addColorStop(1,'#0d1420');c.fillStyle=grad;c.fillRect(0,0,W,H);c.fillStyle='#ffffff0c';for(let i=0;i<12;i++){c.beginPath();c.arc(90+i*105,100+(i%3)*55,2,0,7);c.fill()}
 c.save();c.translate(640,420+P.bob);c.scale(scale,scale);c.rotate(P.tilt);c.fillStyle='#0007';c.beginPath();c.ellipse(0,180,92,17,0,0,7);c.fill();
 // legs: upper/lower articulated segments
-function leg(side,a){c.save();c.translate(side*27,68);c.rotate(a);limb(c,0,0,58,.08,22,color);c.translate(0,58);c.rotate(-a*.35);limb(c,0,0,55,-.05,17,'#d9e2f0');c.restore()}
+function leg(side,a){articulatedLimb(c,side*27,68,55,58,a,side===-1?-.22:.22,22,color)}
 leg(-1,P.legL);leg(1,P.legR);
 // torso and arms
 roundRect(c,-49,-52,98,132,30);c.fillStyle=color; // redraw torso
 c.fillStyle=color;roundRect(c,-49,-52,98,132,30);
-limb(c,-42,-33,62,P.armL,19,color);limb(c,42,-33,62,P.armR,19,color);
+articulatedLimb(c,-42,-33,43,39,P.armL,-.35,19,color);articulatedLimb(c,42,-33,43,39,P.armR,.35,19,color);
 c.fillStyle='#f2c9a5';c.beginPath();c.arc(0,-105,56,0,7);c.fill();c.fillStyle='#182337';c.beginPath();c.arc(0,-122,57,Math.PI,Math.PI*2);c.fill();c.fillRect(-56,-124,112,18);
 let gaze=$('cgaze').value==='left'?-4:$('cgaze').value==='right'?4:0,expr=$('cexpression').value;c.fillStyle='#182337';c.beginPath();c.arc(-19+gaze,-106,expr==='surprised'?7:5,0,7);c.arc(19+gaze,-106,expr==='surprised'?7:5,0,7);c.fill();c.strokeStyle='#8e4d50';c.lineWidth=4;c.beginPath();if(expr==='happy')c.arc(0,-94,15,.12,Math.PI-.12);else if(expr==='sad')c.arc(0,-76,14,Math.PI+.2,Math.PI*2-.2);else if(expr==='surprised'){c.fillStyle='#8e4d50';c.beginPath();c.ellipse(0,-87,7,11,0,0,7);c.fill()}else if(expr==='angry'){c.moveTo(-31,-121);c.lineTo(-9,-115);c.moveTo(31,-121);c.lineTo(9,-115);c.stroke();c.beginPath();c.moveTo(-12,-83);c.lineTo(12,-83)}else c.moveTo(-10,-88),c.lineTo(10,-88);c.stroke();
 // simple shirt badge
