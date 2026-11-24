@@ -22,3 +22,5 @@
 .director-card{border-color:#65568c;background:linear-gradient(135deg,#1b1a2a,#151a24)}.director-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.director-head strong{font-size:14px}.compact-upload{padding:10px 14px;font-size:9px;white-space:nowrap}.mt-clock{font-variant-numeric:tabular-nums;color:var(--accent);font-size:11px;font-weight:800}.director-card .row{align-items:center;flex-wrap:wrap}.director-card .card-title{margin-bottom:7px}
 
 .director-connect{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end;margin-top:14px}.director-connect label{display:grid;gap:6px;font-size:10px;letter-spacing:.08em;color:var(--muted)}.director-connect input{min-width:0;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text)}@media(max-width:760px){.director-connect{grid-template-columns:1fr 1fr}.director-connect button{width:100%}}
+
+.mt-word-cue i{font-style:normal;opacity:.8}.mt-word-cue i.active{color:#ffe36e;opacity:1;text-shadow:0 0 14px rgba(255,227,110,.4)}
