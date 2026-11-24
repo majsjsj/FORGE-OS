@@ -64,3 +64,28 @@ For a video render, set `settings.video=true`; Blender's FFmpeg/H.264 support mu
 - No downloaded assets, copyrighted references, branded products, franchise characters or living-artist imitation are bundled. Use original, user-owned or properly licensed assets and retain provenance in the FORGE rights ledger.
 - The bridge now imports GLB/GLTF/FBX models and optional base-color image textures, alongside primitive-based scenes, basic materials, lights, one camera and transform animation. It does not yet support rigged-character retargeting, full PBR texture sets (normal/roughness/metallic maps), physics simulations, compositing nodes, audio, transitions between shots, progress/cancellation, remote rendering or studio preview handoff.
 - The MCP validator and source syntax are static checks only. Blender has not been installed or executed, and no rendered output has been verified.
+
+
+## Rigged character animation actions
+
+Imported GLB/GLTF or FBX assets may include an Armature and animation Actions. A manifest can select an existing action by exact Blender action name and place it on an NLA track:
+
+```json
+{
+  "id": "hero",
+  "type": "imported_model",
+  "asset": "characters/original-hero.glb",
+  "animation": {
+    "action": "WalkCycle",
+    "target": "Armature",
+    "start_frame": 1,
+    "end_frame": 49,
+    "repeat": 2,
+    "scale": 1,
+    "blend_in": 4,
+    "blend_out": 4
+  }
+}
+```
+
+The action, target and frame range must correspond to data actually present in the supplied asset. The target is an imported Armature object name. This selects and schedules an existing animation; it does not generate, retarget, repair or synthesize motion. Frame values and repetitions are authored by Claude as director. Assets must be original, user-owned or properly licensed.
