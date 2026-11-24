@@ -89,3 +89,29 @@ Imported GLB/GLTF or FBX assets may include an Armature and animation Actions. A
 ```
 
 The action, target and frame range must correspond to data actually present in the supplied asset. The target is an imported Armature object name. This selects and schedules an existing animation; it does not generate, retarget, repair or synthesize motion. Frame values and repetitions are authored by Claude as director. Assets must be original, user-owned or properly licensed.
+
+
+## Facial expression and shape-key animation
+
+Imported character meshes may animate shape keys (blend shapes) already present in the supplied GLB/GLTF or FBX asset. Add `shape_keys` to an imported model:
+
+```json
+{
+  "id": "hero",
+  "type": "imported_model",
+  "asset": "characters/original-hero.glb",
+  "shape_keys": [
+    {
+      "target": "FaceMesh",
+      "key": "Smile",
+      "keyframes": [
+        {"frame": 12, "value": 0},
+        {"frame": 20, "value": 0.8},
+        {"frame": 36, "value": 0}
+      ]
+    }
+  ]
+}
+```
+
+The mesh target is optional only when the key name resolves to exactly one imported mesh. The key must already exist in the asset. Values are limited to -1 through 1 and frames must be strictly increasing. This schedules existing blend shapes; it does not create facial geometry, infer emotions, generate phonemes or synchronize lips to audio automatically.
