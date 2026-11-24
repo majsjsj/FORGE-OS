@@ -113,8 +113,13 @@ def import_model(item, assets_root):
         strip = track.strips.new(action.name, int(animation["start_frame"]), action)
         strip.action_frame_start = float(animation.get("action_start", action.frame_range[0]))
         strip.action_frame_end = float(animation.get("action_end", action.frame_range[1]))
-        strip.repeat = float(animation.get("repeat", 1.0))
-        strip.scale = float(animation.get("scale", 1.0))
+        repeat = float(animation.get("repeat", 1.0))
+        target_duration = float(animation["end_frame"] - animation["start_frame"])
+        source_duration = float(strip.action_frame_end - strip.action_frame_start)
+        if source_duration <= 0 or target_duration <= 0:
+            raise ValueError("Animation source and target frame ranges must be positive.")
+        strip.repeat = repeat
+        strip.scale = (source_duration * repeat / target_duration) * float(animation.get("speed", 1.0))
         strip.blend_in = float(animation.get("blend_in", 0.0))
         strip.blend_out = float(animation.get("blend_out", 0.0))
         strip.use_auto_blend = False
