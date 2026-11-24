@@ -99,3 +99,10 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The public endpoint exposes only the explicitly selected plan file from the public repository's isolated project branch; it is read-only and constrained to `workspace/` and `forge/projects/`. CORS is restricted to the FORGE GitHub Pages origin.
 - This is near-real-time polling, not a bidirectional socket. Claude publishes plans through MCP; the browser applies them. The current plan contract controls total runtime and six track types. Local media bytes remain in the browser and are not uploaded by this bridge.
 - The Worker source and studio files are committed to the feature branch only. Worker deployment, Pages publication, CI, and browser end-to-end testing have not been run.
+
+
+## Claude-directed visual scene sequences
+
+- MCP plans may include a top-level `scenes` array for the Motion Graphics renderer. Each scene can specify title/subtitle/metric/data/copy, template, chart, virtual camera, accent, transition, transition duration/easing, and its own `duration`.
+- The sum of Claude-selected visual scene durations must equal the plan's total runtime. The Worker validates this before publishing, and the browser imports the complete scene sequence into `ForgeMotionGraphics` when a new plan arrives.
+- Removed the renderer's former 4–60 second per-scene clamp for director-supplied plans. Scene and transition durations now follow Claude's plan, subject only to positive-value and practical payload validation. The manual controls no longer impose a 60-second maximum.
