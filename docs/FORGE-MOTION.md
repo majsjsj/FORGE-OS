@@ -153,3 +153,5 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - Supported origin labels are user/team-created, generated for the project, licensed/permission-granted, and claimed public-domain. These are user-entered declarations, not independently verified statuses.
 - Ledger records are stored in this browser and can be exported/imported as JSON. They are not uploaded automatically or sent to a provider.
 - The ledger is documentation, not legal advice, automated copyright detection, license verification or a guarantee of commercial-use rights. Users must verify the actual license and retain supporting evidence before publication.
+
+- The explicit Director handoff JSON includes the current ledger snapshot as `assetRights`, allowing Claude to review provenance and restrictions while preparing the production plan. The snapshot is exported by the user; the ledger is not silently uploaded or synchronized.
