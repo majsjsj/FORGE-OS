@@ -2118,6 +2118,14 @@ export default {
             if (item.source !== undefined && item.source !== "user-authored" && item.source !== "user-authorized") throw new Error("Saved Creative Bible contains an unauthorized source label.");
           }
         }
+        if (Array.isArray(plan.scenes) && plan.creativeBible) {
+          const charIds=new Set(plan.creativeBible.characters.map(x=>x.id)),worldIds=new Set(plan.creativeBible.worlds.map(x=>x.id));
+          for (let i=0;i<plan.scenes.length;i++) {
+            const scene=plan.scenes[i];
+            if (scene.characterRefs !== undefined && (!Array.isArray(scene.characterRefs) || scene.characterRefs.length > 30 || scene.characterRefs.some(id=>typeof id !== "string" || !charIds.has(id)))) throw new Error("Saved scene " + (i+1) + " references an unknown character.");
+            if (scene.worldRef !== undefined && !worldIds.has(scene.worldRef)) throw new Error("Saved scene " + (i+1) + " references an unknown world.");
+          }
+        }
         if (Array.isArray(plan.scenes)) {
           if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Saved visual scene list is invalid.");
           const total = plan.scenes.reduce((sum, scene) => {
