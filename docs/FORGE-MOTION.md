@@ -137,3 +137,11 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - This is a director-plan viewer and metadata contract, not a new 3D renderer or AI video-generation backend. The existing motion-graphics renderer still supports its documented Canvas 2D scene vocabulary; other shot directions are instructions for future or external rendering engines.
 
 - Continuity metadata supported per scene: `continuityNote`, `environment`, `wardrobe`, `props[]`, and `characterRefs[]`. These help Claude and downstream renderers preserve character, costume, location and prop consistency across cuts; they are direction metadata, not automatic character-reference generation.
+
+
+## Original Character & World Bible (original-IP workflow)
+
+- The Storyboard panel includes a local-first Character & World Bible for user-authored or user-authorized original characters and locations. Character records include role, visual description, wardrobe/materials, personality/movement and palette. World records include environment, lighting/atmosphere and materials/motifs.
+- The library is stored in browser localStorage under `forge-motion-creative-bible-v1`; it supports JSON import/export and local removal. It is not uploaded automatically and contains no third-party reference-image downloader.
+- Production rule: use original/user-owned/licensed assets only. Do not reproduce protected franchise characters, logos, branded designs, existing artwork, or imitate a living artist. Broad technical descriptors (camera, lighting, medium, palette) should be described independently in original language.
+- This library is a continuity/specification tool, not an image generator or rights-clearance service. Users remain responsible for confirming permissions for any imported material.
