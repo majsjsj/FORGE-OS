@@ -88,7 +88,7 @@ Imported GLB/GLTF or FBX assets may include an Armature and animation Actions. A
 }
 ```
 
-The action, target and frame range must correspond to data actually present in the supplied asset. The target is an imported Armature object name. This selects and schedules an existing animation; it does not generate, retarget, repair or synthesize motion. Frame values and repetitions are authored by Claude as director. Assets must be original, user-owned or properly licensed.
+The action, target and frame range must correspond to data actually present in the supplied asset. The target is an imported Armature object name. The NLA strip is scaled to the director-selected scene frame window; a higher `speed` value plays the source action faster, while `repeat` controls the number of source cycles. This selects and schedules an existing animation; it does not generate, retarget, repair or synthesize motion. Frame values and repetitions are authored by Claude as director. Assets must be original, user-owned or properly licensed.
 
 
 ## Facial expression and shape-key animation
