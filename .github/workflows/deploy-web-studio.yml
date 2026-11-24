@@ -40,22 +40,6 @@ jobs:
           cp studio/index.html studio/studio.css studio/studio.js studio/features.js studio/advanced-tools.js _site/studio/
           cp -R studio/motion/. _site/studio/motion/
           cp workspace/blank-project/index.html workspace/blank-project/styles.css workspace/blank-project/script.js _site/workspace/blank-project/
-      - name: Remove previous Pages artifacts from this run
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
-        with:
-          script: |
-            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            for (const artifact of artifacts.filter(item => item.name === "github-pages")) {
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-              });
-            }
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa
         with:
