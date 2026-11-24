@@ -972,6 +972,21 @@ async function callTool(name, args, env) {
           throw new Error("Invalid visual intent in voice segment " + (i+1) + ".");
       }
     }
+    if (plan.creativeBible !== undefined) {
+      const bible=plan.creativeBible;
+      if (!bible || bible.version !== 1 || bible.originality !== "user-created-or-authorized-only" || !Array.isArray(bible.characters) || !Array.isArray(bible.worlds) || bible.characters.length > 100 || bible.worlds.length > 100)
+        throw new Error("Creative Bible must declare original or authorized content and contain valid character/world arrays.");
+      for (const [kind,items] of [["character",bible.characters],["world",bible.worlds]]) for (let i=0;i<items.length;i++) {
+        const item=items[i];
+        if (!item || typeof item.id !== "string" || !item.id.trim() || typeof item.name !== "string" || !item.name.trim() || item.name.length > 100)
+          throw new Error("Invalid " + kind + " identity in Creative Bible.");
+        const fields=kind==="character"?["role","visualDescription","wardrobe","traits","palette"]:["description","lighting","materials"];
+        for (const field of fields) if (item[field] !== undefined && (typeof item[field] !== "string" || item[field].length > 2000))
+          throw new Error("Invalid " + field + " in Creative Bible " + kind + " " + (i+1) + ".");
+        if (item.source !== undefined && item.source !== "user-authored" && item.source !== "user-authorized")
+          throw new Error("Creative Bible assets must be user-authored or user-authorized.");
+      }
+    }
     if (Array.isArray(plan.scenes)) {
       if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Visual scene list must contain 1 to 300 scenes.");
       const sceneTotal = plan.scenes.reduce((sum, scene, index) => {
