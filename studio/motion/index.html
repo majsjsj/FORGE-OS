@@ -42,6 +42,31 @@
 <section class="panel" id="panel-storyboard">
 <div class="heading"><div><div class="eyebrow">SHOT DESIGN</div><h1>Storyboard</h1><p>Build scenes and direct each shot, camera move, action, lighting and sound cue.</p></div><button id="addSceneBtn" class="primary">+ ADD SCENE</button></div>
 <div id="sceneList" class="scene-list"><div class="empty">No scenes yet. Create a starter storyboard from your brief.</div></div>
+<section class="card creative-bible" id="creativeBible">
+<div class="creative-bible-head"><div><div class="card-title">ORIGINAL CHARACTER & WORLD BIBLE</div><p class="hint">Build original characters, locations and visual rules. No borrowed franchises, branded characters, copied artwork or living-artist imitation.</p></div><span class="original-only-tag">ORIGINAL IP ONLY</span></div>
+<div class="originality-notice">Original-work gate: only add characters, worlds and references you created, own, or are licensed to use. Describe broad production qualities in your own words; do not request a protected character or a direct copy of another creator's work.</div>
+<div class="bible-grid">
+<div class="bible-form"><h3>CHARACTER DESIGN</h3>
+<label>Character name<input id="cbCharName" maxlength="100" placeholder="e.g. Noura"></label>
+<label>Role / story function<input id="cbCharRole" maxlength="160" placeholder="Lead explorer"></label>
+<label>Original visual description<textarea id="cbCharVisual" maxlength="1800" rows="3" placeholder="Distinctive face, silhouette, proportions and identifying features"></textarea></label>
+<label>Wardrobe & materials<textarea id="cbCharWardrobe" maxlength="1200" rows="2" placeholder="Original costume, fabrics, colors and details"></textarea></label>
+<label>Personality & motion<textarea id="cbCharTraits" maxlength="1000" rows="2" placeholder="Temperament, gestures, movement language"></textarea></label>
+<label>Palette<input id="cbCharPalette" maxlength="100" placeholder="#243047, #E5B96A"></label>
+<button id="cbAddCharacter" class="primary">＋ ADD ORIGINAL CHARACTER</button>
+</div>
+<div class="bible-form"><h3>WORLD / LOCATION</h3>
+<label>World or location name<input id="cbWorldName" maxlength="100" placeholder="e.g. The Glass Dunes"></label>
+<label>Environment description<textarea id="cbWorldVisual" maxlength="1800" rows="3" placeholder="Original geography, architecture, atmosphere and scale"></textarea></label>
+<label>Lighting & atmosphere<textarea id="cbWorldLight" maxlength="1000" rows="2" placeholder="Time of day, lighting logic, weather and mood"></textarea></label>
+<label>Materials & recurring motifs<textarea id="cbWorldMaterials" maxlength="1000" rows="2" placeholder="Surfaces, shapes, symbols and environmental details"></textarea></label>
+<button id="cbAddWorld" class="primary">＋ ADD ORIGINAL WORLD</button>
+</div></div>
+<div class="bible-lists"><div><h3>CHARACTER LIBRARY <span id="cbCharacterCount">0</span></h3><div id="cbCharacters" class="bible-items"><div class="empty">No original characters yet.</div></div></div>
+<div><h3>WORLD LIBRARY <span id="cbWorldCount">0</span></h3><div id="cbWorlds" class="bible-items"><div class="empty">No original worlds yet.</div></div></div></div>
+<div class="bible-actions"><button id="cbExport" class="quiet">EXPORT CREATIVE BIBLE JSON</button><label class="upload compact-upload">IMPORT CREATIVE BIBLE<input id="cbImport" type="file" accept="application/json"></label><button id="cbClear" class="quiet">CLEAR LOCAL BIBLE</button></div>
+<p class="hint">The creative bible stays in this browser until exported or included in a Claude production-plan handoff. No reference images are copied from third parties.</p>
+</section>
 <div class="card visual-director-card"><div class="card-title">CLAUDE VISUAL STORY DIRECTION</div><p class="hint">The approved Claude plan appears here as a shot-by-shot visual direction sheet. Timing and scene count remain Claude decisions.</p><div id="directorVisualScenes" class="director-visual-scenes"><div class="empty">Waiting for Claude's visual scene plan.</div></div></div>
 </section>
 <section class="panel" id="panel-timeline">
@@ -152,4 +177,5 @@
 <script src="motion-graphics.js"></script>
 <script src="multitrack.js"></script>
 <script src="director.js"></script>
+<script src="creative-bible.js"></script>
 </body></html>
