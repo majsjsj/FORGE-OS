@@ -121,3 +121,10 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The multitrack editor can analyze the selected linked narration/music/SFX file locally with Web Audio decode. It draws a 240-bin peak waveform, estimates a tempo candidate (60–180 BPM) by autocorrelation of positive RMS-energy changes, identifies onset candidates, and groups active-energy regions.
 - The analysis metadata is stored with the media asset in the local project and included in the JSON director handoff as `audioAnalysis`. The original audio bytes are not uploaded by this feature.
 - BPM, onsets and active regions are heuristic signal-analysis outputs, not reliable beat tracking, speech recognition, transcript alignment, emotion recognition or semantic scene understanding. Claude reviews the measurements and remains responsible for the final creative timing.
+
+
+## Voice segmentation and scene direction handoff
+
+- The Audio & Voice panel can split a user-provided transcript into ordered spoken units while preserving the exact text. This is transcript segmentation only; it does not infer word timestamps, speaker identity, emotion or audio semantics.
+- The director JSON handoff includes these units as `voiceSegments`. Claude can assign final start/end times, speaker labels and visual scene intent, then publish the approved production plan through MCP.
+- The Worker validates transcript unit count, text, optional speaker/scene intent, and optional paired timing within the approved runtime. Untimed segments remain untimed until Claude directs them. No duration is auto-assigned by the studio.
