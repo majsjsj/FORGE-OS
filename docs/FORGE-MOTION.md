@@ -89,3 +89,13 @@ This milestone provides a working local timeline and preview, not a frame-accura
   ]
 }
 ```
+
+
+## Live Claude Director MCP bridge
+
+- Added MCP tools `forge_motion_plan_read` and `forge_motion_plan_save`. Claude writes the approved version-1 plan to `workspace/<project>/FORGE_MOTION_PLAN.json` on an existing `forge/projects/<name>` branch. Updates use the latest file SHA to reject stale writes.
+- Added a read-only Worker endpoint `GET /motion-plan?project=workspace/<project>&ref=forge%2Fprojects%2F<name>`. The static studio polls it every five seconds after the user connects the project branch and path. New committed plans are validated by the browser and applied through `ForgeMotionMultitrack.applyDirectorPlan`.
+- This uses the existing GitHub-backed project storage and existing Worker binding; it creates no new database, bucket, or paid service. The browser stores only the selected project path/branch, never the MCP bearer token.
+- The public endpoint exposes only the explicitly selected plan file from the public repository's isolated project branch; it is read-only and constrained to `workspace/` and `forge/projects/`. CORS is restricted to the FORGE GitHub Pages origin.
+- This is near-real-time polling, not a bidirectional socket. Claude publishes plans through MCP; the browser applies them. The current plan contract controls total runtime and six track types. Local media bytes remain in the browser and are not uploaded by this bridge.
+- The Worker source and studio files are committed to the feature branch only. Worker deployment, Pages publication, CI, and browser end-to-end testing have not been run.
