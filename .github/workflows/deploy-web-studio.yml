@@ -1,13 +1,6 @@
 name: Deploy FORGE Studio
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "studio/**"
-      - "workspace/blank-project/**"
-      - "site/**"
-      - ".github/workflows/deploy-web-studio.yml"
   workflow_dispatch:
 
 
