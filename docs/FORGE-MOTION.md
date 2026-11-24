@@ -65,3 +65,27 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - Audio clip start offsets, trim in/out, gain, fade-in and fade-out are scheduled in the Web Audio graph for the export.
 - The exporter is a first-pass real-time compositor: one active video layer at a time, basic centered image/title overlays, and simple bottom captions. It is not a frame-accurate NLE; no multi-video layer compositing, transitions between imported clips, color grading, keyframe animation, waveform UI, MP4/H.264 encoding, or browser QA are claimed.
 - Export requires media files to be available/relinked in the current browser session. The result is a local WebM download; no cloud rendering or paid service is invoked.
+
+
+## Claude Executive Director contract
+
+- Claude is the production authority for scene count, scene/clip timing, total runtime, frame rate and aspect ratio. The editor treats an applied director plan as the approved source of truth; runtime is no longer inferred from a fixed 60-second ruler when a plan is active.
+- `ForgeMotionMultitrack.applyDirectorPlan(plan)` validates and applies a version-1 plan with an explicit positive duration and clips containing track type, start, trim-in and trim-out. Clip timing outside the approved runtime is rejected.
+- The browser UI can import/export the plan as JSON and displays the director-approved runtime. A clear action returns the editor to its local/manual timeline mode.
+- This is the frontend contract and manual plan handoff. A live Claude-to-studio connection still requires a registered MCP tool/host bridge that calls this API; the current static page does not independently invoke Claude or claim a live connection.
+- Plan example:
+
+```json
+{
+  "version": 1,
+  "title": "Claude-directed launch film",
+  "duration": 42,
+  "fps": 30,
+  "aspectRatio": "9:16",
+  "clips": [
+    {"type":"video","name":"Opening","start":0,"in":0,"out":6},
+    {"type":"narration","name":"Voice-over","start":0.5,"in":0,"out":42,"volume":0.9,"fadeIn":0.4,"fadeOut":1.2},
+    {"type":"captions","name":"Opening caption","text":"A new story begins","start":1,"in":0,"out":4}
+  ]
+}
+```
