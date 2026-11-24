@@ -74,6 +74,25 @@ def animate(obj, keyframes):
                 setattr(obj, attr, value)
                 obj.keyframe_insert(data_path=attr, frame=frame)
 
+def animate_shape_keys(imported_objects, directives):
+    for directive in directives or []:
+        target_name = directive.get("target")
+        candidates = [obj for obj in imported_objects if obj.type == "MESH" and obj.data.shape_keys]
+        if target_name:
+            candidates = [obj for obj in candidates if obj.name == target_name]
+        matches = []
+        for obj in candidates:
+            block = obj.data.shape_keys.key_blocks.get(directive["key"])
+            if block is not None:
+                matches.append((obj, block))
+        if len(matches) != 1:
+            raise ValueError("Shape key '%s' must resolve to exactly one imported mesh; check target and asset." % directive["key"])
+        _obj, block = matches[0]
+        for point in directive["keyframes"]:
+            block.value = float(point["value"])
+            block.keyframe_insert(data_path="value", frame=int(point["frame"]))
+
+
 def import_model(item, assets_root):
     path = asset_file(item["asset"], assets_root, {".glb", ".gltf", ".fbx"})
     before = set(bpy.data.objects)
@@ -94,6 +113,7 @@ def import_model(item, assets_root):
     root.location = vec(item.get("location"), (0, 0, 0))
     root.rotation_euler = tuple(math.radians(x) for x in vec(item.get("rotation"), (0, 0, 0)))
     root.scale = vec(item.get("scale"), (1, 1, 1))
+    animate_shape_keys(imported, item.get("shape_keys"))
     animation = item.get("animation")
     if animation:
         action = bpy.data.actions.get(animation["action"])
