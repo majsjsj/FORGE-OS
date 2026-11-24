@@ -51,7 +51,7 @@ The UI does not itself provide AI transcription, generated video, Blender render
 - Editable clip start, trim-in, trim-out and duration, plus caption and graphic-title text clips.
 - Audio volume, fade-in and fade-out controls are applied during local browser playback.
 - Play, pause, stop, scrub, video clip preview and timed text overlays.
-- Clip metadata and edit settings are saved in project JSON/local storage. Browser media bytes and temporary object URLs are intentionally not embedded; local files must be reselected after reopening or moving the project.
+- Clip metadata and edit settings are saved in project JSON/local storage. Browser media bytes and temporary object URLs are intentionally not embedded; use the media shelf's relink action to reconnect local files after reopening or moving the project.
 
 ## Multitrack limitations
 
