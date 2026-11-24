@@ -973,11 +973,29 @@ function validateBlenderJob(job) {
   for (const l of job.lights || []) {
     if (!l || !["POINT","SUN","SPOT","AREA"].includes(l.type)) throw new Error("Light type must be POINT, SUN, SPOT, or AREA.");
     checkVec(l.location || [0,0,5], "Light location");
+    if (l.rotation !== undefined) checkVec(l.rotation, "Light rotation");
     if (l.energy !== undefined && (!Number.isFinite(Number(l.energy)) || Number(l.energy)<0 || Number(l.energy)>10000000)) throw new Error("Light energy is out of range.");
+    if (l.color !== undefined && (!Array.isArray(l.color) || l.color.length !== 3 || l.color.some(n => !Number.isFinite(Number(n)) || Number(n)<0 || Number(n)>1))) throw new Error("Light color must be RGB values from 0 to 1.");
+    if (l.size !== undefined && (!Number.isFinite(Number(l.size)) || Number(l.size)<=0 || Number(l.size)>10000)) throw new Error("Light size is out of range.");
   }
   const camera=job.camera || {};
   if (camera.location) checkVec(camera.location,"Camera location");
   if (camera.rotation) checkVec(camera.rotation,"Camera rotation");
+  if (camera.lens !== undefined && (!Number.isFinite(Number(camera.lens)) || Number(camera.lens)<1 || Number(camera.lens)>1000)) throw new Error("Camera lens must be between 1 and 1000 mm.");
+  if (camera.keyframes !== undefined) {
+    if (!Array.isArray(camera.keyframes) || camera.keyframes.length > 200) throw new Error("Camera supports at most 200 keyframes.");
+    let last=-1;
+    for (const k of camera.keyframes) {
+      if (!k || !Number.isInteger(Number(k.frame)) || Number(k.frame)<1 || Number(k.frame)<=last) throw new Error("Camera keyframes must use strictly increasing positive integer frames.");
+      last=Number(k.frame);
+      if (k.location) checkVec(k.location,"Camera keyframe location");
+      if (k.rotation) checkVec(k.rotation,"Camera keyframe rotation");
+      if (k.scale) checkVec(k.scale,"Camera keyframe scale",1000);
+    }
+  }
+  if (settings.resolution_percentage !== undefined && (!Number.isInteger(Number(settings.resolution_percentage)) || Number(settings.resolution_percentage)<1 || Number(settings.resolution_percentage)>100)) throw new Error("resolution_percentage must be an integer from 1 to 100.");
+  if (settings.world_color !== undefined && (!Array.isArray(settings.world_color) || settings.world_color.length !== 4 || settings.world_color.some(n => !Number.isFinite(Number(n)) || Number(n)<0 || Number(n)>1))) throw new Error("world_color must be RGBA values from 0 to 1.");
+  if (settings.world_strength !== undefined && (!Number.isFinite(Number(settings.world_strength)) || Number(settings.world_strength)<0 || Number(settings.world_strength)>100)) throw new Error("world_strength is out of range.");
   const frameStart=Number(settings.frame_start ?? 1), frameEnd=Number(settings.frame_end ?? 120);
   if (!Number.isInteger(frameStart)||!Number.isInteger(frameEnd)||frameStart<1||frameEnd<frameStart||frameEnd-frameStart>1000000)
     throw new Error("Invalid frame range.");
