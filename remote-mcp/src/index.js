@@ -987,6 +987,15 @@ async function callTool(name, args, env) {
           throw new Error("Creative Bible assets must be user-authored or user-authorized.");
       }
     }
+    if (Array.isArray(plan.scenes) && plan.creativeBible) {
+      const charIds=new Set(plan.creativeBible.characters.map(x=>x.id));
+      const worldIds=new Set(plan.creativeBible.worlds.map(x=>x.id));
+      for (let i=0;i<plan.scenes.length;i++) {
+        const scene=plan.scenes[i];
+        if (scene.characterRefs !== undefined && scene.characterRefs.some(id=>!charIds.has(id))) throw new Error("Scene " + (i+1) + " references a character missing from Creative Bible.");
+        if (scene.worldRef !== undefined && !worldIds.has(scene.worldRef)) throw new Error("Scene " + (i+1) + " references a world missing from Creative Bible.");
+      }
+    }
     if (Array.isArray(plan.scenes)) {
       if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Visual scene list must contain 1 to 300 scenes.");
       const sceneTotal = plan.scenes.reduce((sum, scene, index) => {
@@ -996,7 +1005,7 @@ async function callTool(name, args, env) {
         const enumFields = { shotType:["extreme-wide","wide","full","medium","close-up","extreme-close-up","overhead","pov","tracking","insert","aerial"], cameraMove:["static","push-in","pull-out","pan-left","pan-right","tilt-up","tilt-down","orbit","dolly","crane","handheld","tracking","zoom"], transition:["cut","fade","dissolve","wipe","zoom","match-cut","whip-pan","dip-to-black"] };
         for (const [field, allowed] of Object.entries(enumFields)) if (scene[field] !== undefined && !allowed.includes(scene[field])) throw new Error("Unsupported " + field + " in visual scene " + (index+1) + ".");
         for (const field of ["title","sceneIntent","description","action","lighting","graphics","soundCue","voiceSegmentId","lens","composition","colorMood"]) if (scene[field] !== undefined && (typeof scene[field] !== "string" || scene[field].length > 2000)) throw new Error("Invalid " + field + " in visual scene " + (index+1) + ".");
-        for (const field of ["continuityNote","environment","wardrobe"]) if (scene[field] !== undefined && (typeof scene[field] !== "string" || scene[field].length > 2000)) throw new Error("Invalid " + field + " in visual scene " + (index+1) + ".");
+        for (const field of ["continuityNote","environment","wardrobe","worldRef"]) if (scene[field] !== undefined && (typeof scene[field] !== "string" || scene[field].length > 2000)) throw new Error("Invalid " + field + " in visual scene " + (index+1) + ".");
         if (scene.props !== undefined && (!Array.isArray(scene.props) || scene.props.length > 40 || scene.props.some(p => typeof p !== "string" || p.length > 160))) throw new Error("Invalid props list in visual scene " + (index+1) + ".");
         if (scene.characterRefs !== undefined && (!Array.isArray(scene.characterRefs) || scene.characterRefs.length > 30 || scene.characterRefs.some(p => typeof p !== "string" || p.length > 160))) throw new Error("Invalid characterRefs in visual scene " + (index+1) + ".");
         if (scene.transitionDuration !== undefined && (!Number.isFinite(Number(scene.transitionDuration)) || Number(scene.transitionDuration) <= 0))
@@ -2099,6 +2108,16 @@ export default {
         }
         if (!plan || plan.version !== 1 || !Number.isFinite(Number(plan.duration)) || !Array.isArray(plan.clips))
           throw new Error("Saved motion plan failed validation.");
+        if (plan.creativeBible !== undefined) {
+          const bible=plan.creativeBible;
+          if (!bible || bible.version !== 1 || bible.originality !== "user-created-or-authorized-only" || !Array.isArray(bible.characters) || !Array.isArray(bible.worlds) || bible.characters.length > 100 || bible.worlds.length > 100) throw new Error("Saved Creative Bible failed original-content validation.");
+          for (const [kind,items] of [["character",bible.characters],["world",bible.worlds]]) for (const item of items) {
+            if (!item || typeof item.id !== "string" || typeof item.name !== "string" || !item.name.trim() || item.name.length > 100) throw new Error("Saved Creative Bible contains an invalid " + kind + ".");
+            const fields=kind==="character"?["role","visualDescription","wardrobe","traits","palette"]:["description","lighting","materials"];
+            for (const field of fields) if (item[field] !== undefined && (typeof item[field] !== "string" || item[field].length > 2000)) throw new Error("Saved Creative Bible contains invalid " + field + ".");
+            if (item.source !== undefined && item.source !== "user-authored" && item.source !== "user-authorized") throw new Error("Saved Creative Bible contains an unauthorized source label.");
+          }
+        }
         if (Array.isArray(plan.scenes)) {
           if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Saved visual scene list is invalid.");
           const total = plan.scenes.reduce((sum, scene) => {
