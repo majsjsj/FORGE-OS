@@ -1,0 +1,26 @@
+(()=>{
+"use strict";
+const KEY="forge-motion-creative-bible-v1", $=id=>document.getElementById(id);
+let bible={version:1,originality:"user-created-or-authorized-only",characters:[],worlds:[]};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const id=prefix=>prefix+"-"+Math.random().toString(36).slice(2,10);
+function save(){localStorage.setItem(KEY,JSON.stringify(bible));render();}
+function render(){
+ const chars=$("cbCharacters"),worlds=$("cbWorlds");if(!chars||!worlds)return;
+ $("cbCharacterCount").textContent=bible.characters.length;$("cbWorldCount").textContent=bible.worlds.length;
+ chars.innerHTML=bible.characters.map(c=>'<article class="bible-item"><div><b>'+esc(c.name)+'</b><small>'+esc(c.role||"Original character")+'</small></div><p>'+esc(c.visualDescription)+'</p><small>WARDROBE · '+esc(c.wardrobe||"Not specified")+'</small><small>PALETTE · '+esc(c.palette||"Not specified")+'</small><button data-remove-character="'+esc(c.id)+'" class="quiet">REMOVE</button></article>').join("")||'<div class="empty">No original characters yet.</div>';
+ worlds.innerHTML=bible.worlds.map(w=>'<article class="bible-item"><div><b>'+esc(w.name)+'</b></div><p>'+esc(w.description)+'</p><small>LIGHT · '+esc(w.lighting||"Not specified")+'</small><small>MATERIALS · '+esc(w.materials||"Not specified")+'</small><button data-remove-world="'+esc(w.id)+'" class="quiet">REMOVE</button></article>').join("")||'<div class="empty">No original worlds yet.</div>';
+}
+function addCharacter(){const name=$("cbCharName").value.trim(),visualDescription=$("cbCharVisual").value.trim();if(!name||!visualDescription){alert("Add a character name and an original visual description.");return;}bible.characters.push({id:id("char"),name,role:$("cbCharRole").value.trim(),visualDescription,wardrobe:$("cbCharWardrobe").value.trim(),traits:$("cbCharTraits").value.trim(),palette:$("cbCharPalette").value.trim(),source:"user-authored"});["cbCharName","cbCharRole","cbCharVisual","cbCharWardrobe","cbCharTraits","cbCharPalette"].forEach(k=>$(k).value="");save();}
+function addWorld(){const name=$("cbWorldName").value.trim(),description=$("cbWorldVisual").value.trim();if(!name||!description){alert("Add a world name and an original environment description.");return;}bible.worlds.push({id:id("world"),name,description,lighting:$("cbWorldLight").value.trim(),materials:$("cbWorldMaterials").value.trim(),source:"user-authored"});["cbWorldName","cbWorldVisual","cbWorldLight","cbWorldMaterials"].forEach(k=>$(k).value="");save();}
+function download(){const blob=new Blob([JSON.stringify(bible,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="forge-original-creative-bible.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
+$("cbAddCharacter")?.addEventListener("click",addCharacter);$("cbAddWorld")?.addEventListener("click",addWorld);
+$("cbCharacters")?.addEventListener("click",e=>{const b=e.target.closest("[data-remove-character]");if(b){bible.characters=bible.characters.filter(x=>x.id!==b.dataset.removeCharacter);save();}});
+$("cbWorlds")?.addEventListener("click",e=>{const b=e.target.closest("[data-remove-world]");if(b){bible.worlds=bible.worlds.filter(x=>x.id!==b.dataset.removeWorld);save();}});
+$("cbExport")?.addEventListener("click",download);
+$("cbImport")?.addEventListener("change",async e=>{const f=e.target.files?.[0];e.target.value="";if(!f)return;try{if(f.size>256*1024)throw Error("Creative bible exceeds 256 KiB.");const x=JSON.parse(await f.text());if(x?.version!==1||!Array.isArray(x.characters)||!Array.isArray(x.worlds)||x.characters.length>100||x.worlds.length>100)throw Error("Invalid creative bible schema.");for(const [kind,items] of [["character",x.characters],["world",x.worlds]])for(const item of items){if(!item||typeof item.id!=="string"||typeof item.name!=="string"||!item.name.trim()||item.name.length>100)throw Error("Invalid "+kind+" identity.");const fields=kind==="character"?["role","visualDescription","wardrobe","traits","palette"]:["description","lighting","materials"];for(const field of fields)if(item[field]!==undefined&&(typeof item[field]!=="string"||item[field].length>2000))throw Error("Invalid "+field+".");}bible={version:1,originality:"user-created-or-authorized-only",characters:x.characters,worlds:x.worlds};save();}catch(err){alert("Import rejected: "+err.message);}});
+$("cbClear")?.addEventListener("click",()=>{if(!confirm("Clear this browser's local creative bible? Export a backup first if needed."))return;bible={version:1,originality:"user-created-or-authorized-only",characters:[],worlds:[]};save();});
+try{const x=JSON.parse(localStorage.getItem(KEY)||"null");if(x?.version===1&&Array.isArray(x.characters)&&Array.isArray(x.worlds))bible=x;}catch(e){}
+window.ForgeMotionCreativeBible={exportData:()=>JSON.parse(JSON.stringify(bible)),importData:x=>{if(!x||x.version!==1||!Array.isArray(x.characters)||!Array.isArray(x.worlds))throw Error("Invalid creative bible");bible=x;save();}};
+render();
+})();
