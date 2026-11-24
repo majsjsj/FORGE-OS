@@ -992,7 +992,7 @@ async function callTool(name, args, env) {
       const worldIds=new Set(plan.creativeBible.worlds.map(x=>x.id));
       for (let i=0;i<plan.scenes.length;i++) {
         const scene=plan.scenes[i];
-        if (scene.characterRefs !== undefined && scene.characterRefs.some(id=>!charIds.has(id))) throw new Error("Scene " + (i+1) + " references a character missing from Creative Bible.");
+        if (scene.characterRefs !== undefined && (!Array.isArray(scene.characterRefs) || scene.characterRefs.length > 30 || scene.characterRefs.some(id=>typeof id !== "string" || !charIds.has(id)))) throw new Error("Scene " + (i+1) + " references a character missing from Creative Bible.");
         if (scene.worldRef !== undefined && !worldIds.has(scene.worldRef)) throw new Error("Scene " + (i+1) + " references a world missing from Creative Bible.");
       }
     }
