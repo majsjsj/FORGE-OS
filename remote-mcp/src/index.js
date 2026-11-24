@@ -947,12 +947,14 @@ function validateBlenderJob(job) {
     if (m.color !== undefined && (!Array.isArray(m.color) || m.color.length !== 4 || m.color.some(n => !Number.isFinite(Number(n)) || Number(n)<0 || Number(n)>1))) throw new Error("Material color must be RGBA values from 0 to 1.");
     if (m.roughness !== undefined && (!Number.isFinite(Number(m.roughness)) || Number(m.roughness)<0 || Number(m.roughness)>1)) throw new Error("Material roughness must be from 0 to 1.");
     if (m.metallic !== undefined && (!Number.isFinite(Number(m.metallic)) || Number(m.metallic)<0 || Number(m.metallic)>1)) throw new Error("Material metallic must be from 0 to 1.");
+    if (m.base_color_texture !== undefined && (typeof m.base_color_texture !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(m.base_color_texture) || m.base_color_texture.startsWith("/") || m.base_color_texture.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(png|jpe?g|webp|tif?f)$/i.test(m.base_color_texture))) throw new Error("Texture path must be a safe relative image path under the assets directory.");
   }
   const objectIds = new Set();
   for (const [i,o] of job.objects.entries()) {
     if (!o || typeof o.id !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(o.id) || objectIds.has(o.id)) throw new Error("Invalid or duplicate object id at index " + i);
     objectIds.add(o.id);
-    if (!["cube","uv_sphere","cylinder","cone","plane","torus","monkey"].includes(o.type)) throw new Error("Unsupported primitive type at object " + o.id);
+    if (!["cube","uv_sphere","cylinder","cone","plane","torus","monkey","imported_model"].includes(o.type)) throw new Error("Unsupported primitive type at object " + o.id);
+    if (o.type === "imported_model" && (typeof o.asset !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(o.asset) || o.asset.startsWith("/") || o.asset.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(glb|gltf|fbx)$/i.test(o.asset))) throw new Error("Imported models must use a safe relative .glb, .gltf or .fbx asset path.");
     checkVec(o.location || [0,0,0], "Object location");
     checkVec(o.rotation || [0,0,0], "Object rotation");
     checkVec(o.scale || [1,1,1], "Object scale", 1000);
