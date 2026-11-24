@@ -26,10 +26,10 @@ All timing is director-owned. Claude selects frame rate, frame range, camera mov
     "world_color": [0.02, 0.025, 0.04, 1]
   },
   "materials": [
-    {"id": "matte", "name": "Original satin finish", "color": [0.12, 0.3, 0.48, 1], "roughness": 0.32, "metallic": 0.18}
+    {"id": "matte", "name": "Original satin finish", "color": [0.12, 0.3, 0.48, 1], "roughness": 0.32, "metallic": 0.18, "base_color_texture": "textures/hero-albedo.png"}
   ],
   "objects": [
-    {"id": "hero", "type": "cube", "material": "matte", "location": [0, 0, 0], "scale": [1.2, 1.2, 1.2],
+    {"id": "hero", "type": "imported_model", "asset": "models/hero.glb", "material": "matte", "location": [0, 0, 0], "scale": [1, 1, 1],
      "keyframes": [
        {"frame": 1, "rotation": [0, 0, 0]},
        {"frame": 96, "rotation": [0, 0, 360]}
@@ -43,21 +43,24 @@ All timing is director-owned. Claude selects frame rate, frame range, camera mov
 }
 ```
 
-Supported primitives: cube, uv_sphere, cylinder, cone, plane, torus, monkey. Object transform keyframes and camera transform keyframes are supported. Materials use Principled BSDF base color, roughness and metallic. Lights: POINT, SUN, SPOT, AREA.
+Supported primitives: cube, uv_sphere, cylinder, cone, plane, torus, monkey. Imported models: GLB, GLTF and FBX. Textures: one base-color image per declared material (PNG, JPG/JPEG, WebP, TIF/TIFF). Object transform keyframes and camera transform keyframes are supported. Materials use Principled BSDF base color, roughness, metallic and optional base-color texture. Lights: POINT, SUN, SPOT, AREA.
+
+Place approved assets under a dedicated assets directory, preserving the relative paths in the job. Example layout: `assets/models/hero.glb` and `assets/textures/hero-albedo.png`. Run with an explicit assets root:
 
 ## Run on a machine with Blender installed
 From the repository root:
 
 ```bash
-blender --background --python blender/forge_blender_bridge.py -- --job workspace/my-film/BLENDER_JOB.json --output ./renders
+blender --background --python blender/forge_blender_bridge.py -- --job workspace/my-film/BLENDER_JOB.json --assets-root ./assets --output ./renders
 ```
 
 For a video render, set `settings.video=true`; Blender's FFmpeg/H.264 support must be available in that Blender build. With `video=false`, the script renders a still image (the current first pass does not yet render a numbered image sequence).
 
 ## Security and limits
-- Declarative allowlisted primitives only; the manifest cannot supply Python code, shell commands, arbitrary file paths for source assets, or Blender expressions.
+- Declarative allowlisted primitives and import formats only; the manifest cannot supply Python code, shell commands, arbitrary absolute file paths, or Blender expressions.
+- Model and texture paths are relative to the explicit assets root. The runner resolves each path and rejects traversal, hidden path segments, unsupported extensions, missing files, and individual assets larger than 512 MiB. MCP applies its own relative-path and extension allowlists before publication.
 - MCP validates bounded counts, IDs, transforms, keyframes, colors, frame ranges and output dimensions.
 - The renderer reads only the selected manifest and writes into the caller-selected output directory.
 - No downloaded assets, copyrighted references, branded products, franchise characters or living-artist imitation are bundled. Use original, user-owned or properly licensed assets and retain provenance in the FORGE rights ledger.
-- The bridge currently creates primitive-based scenes, basic materials, lights, one camera and transform animation. It does not yet support imported models/textures, rigged characters, physics simulations, compositing nodes, audio, transitions between shots, progress/cancellation, remote rendering or studio preview handoff.
+- The bridge now imports GLB/GLTF/FBX models and optional base-color image textures, alongside primitive-based scenes, basic materials, lights, one camera and transform animation. It does not yet support rigged-character retargeting, full PBR texture sets (normal/roughness/metallic maps), physics simulations, compositing nodes, audio, transitions between shots, progress/cancellation, remote rendering or studio preview handoff.
 - The MCP validator and source syntax are static checks only. Blender has not been installed or executed, and no rendered output has been verified.
