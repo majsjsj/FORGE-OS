@@ -180,7 +180,18 @@
 <div class="hint">The exported clip includes the animated typography, infographic chart, connecting paths, particles and selected virtual camera movement.</div>
 </div>
 </div>
-<div class="card sequence-card"><div class="sequence-heading"><div><div class="card-title">FULL VIDEO · SCENE SEQUENCE</div><div class="hint">Add multiple scenes, choose each scene to edit its visual settings, and render the complete sequence into one WebM.</div></div><button id="mgAddScene" class="primary">+ ADD SCENE</button></div><div id="mgSceneList" class="mg-scene-list"><div class="empty">Your first scene will appear here.</div></div><div class="mg-timeline-wrap"><div class="timeline-title"><span>EDIT TIMELINE</span><span>SELECT A CLIP TO EDIT</span></div><div id="mgTimeline" class="mg-timeline"><div class="empty">Scenes will appear as timeline clips.</div></div></div><div class="sequence-footer"><span id="mgSequenceDuration">0 SEC TOTAL</span><span id="mgSequenceCount">0 SCENES</span></div></div>
+<div class="card sequence-card"><div class="sequence-heading"><div><div class="card-title">FULL VIDEO · SCENE SEQUENCE</div><div class="hint">Add multiple scenes, choose each scene to edit its visual settings, and render the complete sequence into one WebM.</div></div><button id="mgAddScene" class="primary">+ ADD SCENE</button></div><div id="mgSceneList" class="mg-scene-list"><div class="empty">Your first scene will appear here.</div></div><div class="mg-timeline-wrap"><div class="timeline-title"><span>EDIT TIMELINE</span><span>SELECT A CLIP TO EDIT</span></div><div id="mgTimeline" class="mg-timeline"><div class="empty">Scenes will appear as timeline clips.</div></div></div><div class="sequence-footer"><span id="mgSequenceDuration">0 SEC TOTAL</span><span id="mgSequenceCount">0 SCENES</span></div>
+<div class="card sequence-card">
+  <div class="sequence-heading"><div><div class="card-title">BLENDER 3D ENGINE · JOB HANDOFF</div><div class="hint">Prepare or exchange a declarative 3D scene manifest. Claude can validate and publish it through the FORGE Blender MCP tools.</div></div><span class="tag">BLENDER BRIDGE</span></div>
+  <div class="row">
+    <label class="upload compact-upload" for="blenderJobImport">＋ IMPORT BLENDER JOB<input id="blenderJobImport" type="file" accept="application/json,.json"></label>
+    <button id="blenderJobExport" class="primary">EXPORT JOB JSON</button>
+    <button id="blenderJobTemplate" class="quiet">LOAD STARTER</button>
+  </div>
+  <div class="hint" id="blenderJobStatus" role="status">No Blender job loaded. This panel does not launch Blender or render.</div>
+  <textarea id="blenderJobJson" rows="12" spellcheck="false" aria-label="Blender job manifest" placeholder="Import a BLENDER_JOB.json or load the starter manifest."></textarea>
+  <div class="hint">Supported first pass: primitive meshes, Principled materials, one camera, area/point/sun/spot lights and transform keyframes. Blender must be installed separately to execute the job.</div>
+</div></div>
 </section>
 </section>
 <aside class="inspector">
@@ -198,4 +209,5 @@
 <script src="multitrack.js"></script>
 <script src="director.js"></script>
 <script src="creative-bible.js"></script>\n<script src="asset-rights.js"></script>
+<script src="blender-bridge-ui.js"></script>
 </body></html>
