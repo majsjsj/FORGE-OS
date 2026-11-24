@@ -11,3 +11,6 @@
 .mg-transition-label input[data-transition-duration]{width:100%;min-width:0;padding:5px!important;font-size:9px!important;margin-top:3px}
 .mg-transition-label{width:104px;flex-basis:104px}
 @media(max-width:700px){.mg-transition-label{width:calc(50% - 8px);flex-basis:calc(50% - 8px)}}
+
+.mg-transition-label select[data-easing]{margin-top:4px;padding:5px!important;font-size:9px!important;width:100%}
+.mg-transition-label input[data-transition-duration]{margin-top:4px}
