@@ -24,3 +24,5 @@
 .director-connect{display:grid;grid-template-columns:1fr 1fr auto auto;gap:10px;align-items:end;margin-top:14px}.director-connect label{display:grid;gap:6px;font-size:10px;letter-spacing:.08em;color:var(--muted)}.director-connect input{min-width:0;width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text)}@media(max-width:760px){.director-connect{grid-template-columns:1fr 1fr}.director-connect button{width:100%}}
 
 .mt-word-cue i{font-style:normal;opacity:.8}.mt-word-cue i.active{color:#ffe36e;opacity:1;text-shadow:0 0 14px rgba(255,227,110,.4)}
+
+.mt-waveform{display:block;width:100%;height:auto;max-height:170px;margin:14px 0;background:#10131b;border:1px solid var(--line);border-radius:10px}.mt-analysis{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px}.mt-analysis>div{padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:9px}.mt-analysis b,.mt-analysis small{display:block}.mt-analysis b{font-size:17px}.mt-analysis small{font-size:9px;color:var(--muted);margin-top:5px;letter-spacing:.06em}
