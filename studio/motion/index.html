@@ -14,7 +14,7 @@
 <button class="nav active" data-panel="brief">01 <span>Creative brief</span></button>
 <button class="nav" data-panel="storyboard">02 <span>Storyboard</span></button>
 <button class="nav" data-panel="timeline">03 <span>Timeline</span></button>
-<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button><button class="nav" data-panel="graphics">06 <span>Motion graphics</span></button>
+<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button><button class="nav" data-panel="graphics">06 <span>Motion graphics</span></button><button class="nav" data-panel="multitrack">07 <span>Multitrack edit</span></button>
 <div class="rail-bottom"><div class="eyebrow">WORKSPACE STATUS</div><div class="status-line"><i></i> LOCAL PROJECT</div><p>Your project is saved in this browser. No cloud rendering or external AI service is invoked by this page.</p><a href="../index.html">← Back to FORGE Studio</a></div>
 </aside>
 <section class="content">
@@ -90,6 +90,24 @@
 </div>
 </div>
 </section>
+<section class="panel" id="panel-multitrack">
+<div class="heading"><div><div class="eyebrow">EDIT & MIX</div><h1>Multitrack editor</h1><p>Arrange local media on independent tracks, trim clips, set timing and shape audio fades.</p></div><span class="tag">LOCAL TIMELINE</span></div>
+<div class="card mt-toolbar"><div class="row"><button id="mtPlay" class="primary">▶ PLAY</button><button id="mtStop" class="quiet">STOP</button><button id="mtAddCaption" class="quiet">＋ TEXT CLIP</button><button id="mtAddGraphic" class="quiet">＋ GRAPHIC CARD</button><span id="mtClock" class="mt-clock">00:00.0</span></div><label for="mtPlayhead">PLAYHEAD / SCRUB</label><input id="mtPlayhead" type="range" min="0" max="60" step="0.05" value="0"><div class="hint">Import media into its matching track. Clip timing and edit settings are saved in the project; local media files must be reselected after reopening or importing on another device.</div></div>
+<div class="grid-two mt-workspace">
+<div class="card"><div class="card-title">TRACK TIMELINE</div><div id="mtTimeline" class="mt-timeline"></div><div class="mt-scale"><span>0s</span><span>10s</span><span>20s</span><span>30s</span><span>40s</span><span>50s</span><span>60s</span></div></div>
+<div class="card"><div class="card-title">CLIP INSPECTOR</div><div id="mtInspector" class="mt-inspector"><div class="empty">Select a clip to edit its timing and audio.</div></div></div>
+</div>
+<div class="grid-two">
+<div class="card"><div class="card-title">MEDIA IMPORT</div><div class="mt-import-grid">
+<label class="upload">＋ VIDEO · V1<input type="file" accept="video/*" data-mt-import="video"></label>
+<label class="upload">＋ NARRATION · A1<input type="file" accept="audio/*" data-mt-import="narration"></label>
+<label class="upload">＋ MUSIC · A2<input type="file" accept="audio/*" data-mt-import="music"></label>
+<label class="upload">＋ SOUND FX · A3<input type="file" accept="audio/*" multiple data-mt-import="sfx"></label>
+<label class="upload">＋ GRAPHICS · G1<input type="file" accept="image/*" data-mt-import="graphics"></label>
+</div><div id="mtAssets" class="mt-assets"><div class="empty">Imported media will appear here.</div></div></div>
+<div class="card"><div class="card-title">PREVIEW MONITOR</div><div class="mt-preview"><video id="mtVideo" playsinline preload="metadata"></video><div id="mtTextOverlay" class="mt-text-overlay"></div><div id="mtPreviewEmpty">SELECT A VIDEO OR TEXT CLIP</div></div><div class="hint" id="mtPreviewStatus">Preview follows the timeline playhead. This is a local edit preview, not a final composite.</div><div id="mtAudioNodes" hidden></div></div>
+</div>
+</section>
 <section class="panel" id="panel-graphics">
 <div class="heading"><div><div class="eyebrow">ANIMATION & INFOGRAPHICS</div><h1>Motion graphics studio</h1><p>Compose animated titles, data lines, infographic paths and camera movement, then record a complete WebM sequence locally.</p></div><span class="tag">CANVAS RENDERER</span></div>
 <div class="grid-two">
@@ -131,4 +149,5 @@
 <script src="motion.js"></script>
 <script src="post-production.js"></script>
 <script src="motion-graphics.js"></script>
+<script src="multitrack.js"></script>
 </body></html>
