@@ -43,3 +43,16 @@ Subtitle cue timing follows the media player's playback clock. Imported SRT/VTT 
 ## Not yet implemented or verified
 
 The UI does not itself provide AI transcription, generated video, Blender rendering, 2D/3D character animation, a multitrack compositor, audio-mixed final export, or final MP4 export. The motion-graphics canvas is a real local 2D renderer with WebM recording, not an AI video generator or 3D engine. Those require backend services, media engines, dependencies and integration tests. No external provider is called and no paid render is started by this workspace.
+
+## Multitrack editor milestone
+
+- Six independent timeline lanes: video, narration, music, sound effects, captions and graphics.
+- Local video/audio/image import; reusable imported assets can be placed more than once on the timeline.
+- Editable clip start, trim-in, trim-out and duration, plus caption and graphic-title text clips.
+- Audio volume, fade-in and fade-out controls are applied during local browser playback.
+- Play, pause, stop, scrub, video clip preview and timed text overlays.
+- Clip metadata and edit settings are saved in project JSON/local storage. Browser media bytes and temporary object URLs are intentionally not embedded; local files must be reselected after reopening or moving the project.
+
+## Multitrack limitations
+
+This milestone provides a working local timeline and preview, not a frame-accurate nonlinear editor or final compositor. It does not composite multiple video layers, render imported images as overlays, burn captions into output, or export a final mixed MP4/WebM. Audio fades and gain are preview-only; waveform display, media relinking UI, frame-rate timebase, final audio mixdown, compositor/export pipeline and browser QA remain outstanding.
