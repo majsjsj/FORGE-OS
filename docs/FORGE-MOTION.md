@@ -4,8 +4,8 @@
 
 - Multi-scene sequence editor: add, select, duplicate, delete and reorder scenes; each scene stores its own title, subtitle, metric, chart data/type, template, accent, virtual camera move and duration.
 - Full-sequence preview and one-file WebM recording render scenes consecutively in order; the project JSON and local save include the sequence and selected scene.
-- Scene transitions are selectable per incoming scene: cut, crossfade, fade through black, dissolve, directional wipes (left/right/up/down), iris reveal, zoom in/out, directional slides (left/right/up/down), blur dissolve and spin reveal.
-- Each incoming scene has its own editable transition duration (0.25–3 seconds); the setting is stored with that scene and reused in preview and full-sequence WebM recording.
+- Scene transitions are selectable per incoming scene: cut, crossfade, fade through black, dissolve, directional wipes (left/right/up/down), iris reveal, zoom in/out, directional slides (left/right/up/down), blur dissolve and spin reveal, circle and diamond reveals, curtain and center-split reveals, pixel reveal and glitch slices.
+- Each incoming scene has its own editable transition duration (0.25–3 seconds) and easing curve (linear, smooth, ease-in, ease-out, sharp and bounce); both settings are stored with that scene and reused in preview and full-sequence WebM recording.
 - A visual clip timeline scales each clip by duration and lets the editor select scenes directly.
 - Dedicated motion graphics panel with editable title, subtitle, metric, supporting copy, chart values, visual template, accent color and virtual camera move.
 - Canvas animation renders animated typography, infographic line charts, bar charts or connected-node paths, data points, grid/particles and camera push, pull, pan, drift or static framing. The sequence includes an opening reveal and end fade.
