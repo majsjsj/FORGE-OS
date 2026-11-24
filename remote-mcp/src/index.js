@@ -945,6 +945,19 @@ async function callTool(name, args, env) {
           start + outside - inside > Number(plan.duration) + .05)
         throw new Error("Invalid track or timing in clip " + (i+1) + "; every clip must fit within Claude's approved runtime.");
     }
+    if (Array.isArray(plan.scenes)) {
+      if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Visual scene list must contain 1 to 300 scenes.");
+      const sceneTotal = plan.scenes.reduce((sum, scene, index) => {
+        const duration = Number(scene?.duration);
+        if (!scene || !Number.isFinite(duration) || duration <= 0 || duration > 86400)
+          throw new Error("Invalid Claude-selected duration in visual scene " + (index+1) + ".");
+        if (scene.transitionDuration !== undefined && (!Number.isFinite(Number(scene.transitionDuration)) || Number(scene.transitionDuration) <= 0))
+          throw new Error("Invalid transition duration in visual scene " + (index+1) + ".");
+        return sum + duration;
+      }, 0);
+      if (Math.abs(sceneTotal - Number(plan.duration)) > .1)
+        throw new Error("The sum of Claude's visual scene durations must match the approved total runtime.");
+    }
     const content = JSON.stringify({ ...plan, updatedAt: new Date().toISOString(), approvedBy: "claude" }, null, 2);
     if (new TextEncoder().encode(content).length > 256 * 1024) throw new Error("Motion plan exceeds 256 KiB.");
     if (/-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(content) ||
@@ -2027,6 +2040,15 @@ export default {
         const plan = JSON.parse(planText);
         if (!plan || plan.version !== 1 || !Number.isFinite(Number(plan.duration)) || !Array.isArray(plan.clips))
           throw new Error("Saved motion plan failed validation.");
+        if (Array.isArray(plan.scenes)) {
+          if (plan.scenes.length < 1 || plan.scenes.length > 300) throw new Error("Saved visual scene list is invalid.");
+          const total = plan.scenes.reduce((sum, scene) => {
+            const duration = Number(scene?.duration);
+            if (!Number.isFinite(duration) || duration <= 0) throw new Error("Saved visual scene duration is invalid.");
+            return sum + duration;
+          }, 0);
+          if (Math.abs(total - Number(plan.duration)) > .1) throw new Error("Saved scene durations do not match the approved runtime.");
+        }
         return new Response(JSON.stringify({ plan, sha: file.sha, branch, project_path: projectPath }), {
           headers: { ...cors, "content-type": "application/json; charset=utf-8" }
         });
