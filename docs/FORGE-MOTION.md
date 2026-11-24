@@ -155,3 +155,15 @@ This milestone provides a working local timeline and preview, not a frame-accura
 - The ledger is documentation, not legal advice, automated copyright detection, license verification or a guarantee of commercial-use rights. Users must verify the actual license and retain supporting evidence before publication.
 
 - The explicit Director handoff JSON includes the current ledger snapshot as `assetRights`, allowing Claude to review provenance and restrictions while preparing the production plan. The snapshot is exported by the user; the ledger is not silently uploaded or synchronized.
+
+
+## Blender 3D bridge — first executable milestone
+
+- Added a declarative version-1 Blender job format and a Blender background Python runner at `blender/forge_blender_bridge.py`.
+- Added MCP tools `forge_blender_job_validate` (side-effect-free manifest validation) and `forge_blender_job_publish` (writes `BLENDER_JOB.json` to an existing isolated project branch after explicit confirmation).
+- Added a local FORGE MOTION handoff panel to import, validate and export a Blender job JSON manifest. The panel does not launch Blender.
+- The first runner builds allowlisted primitive meshes, Principled BSDF materials, a camera, supported lights and transform keyframes. It can render a still or an H.264 MP4 when the installed Blender build includes FFmpeg support.
+- Claude remains the director: it chooses shot structure, frame range, frame rate, camera moves and keyframe timing. The sample manifest is only a starter example, not a creative timing limit.
+- No arbitrary Python expressions, shell commands or user-supplied executable code are accepted in the declarative job. The MCP validator bounds object/material/light counts, transform vectors, IDs, keyframes and output dimensions.
+- This milestone does not yet import arbitrary 3D models or textures, rig characters, simulate physics, composite multiple shots, mix audio, report render progress, cancel jobs, upload outputs, or return a rendered preview to the studio.
+- Blender was not downloaded or installed; the runner was not executed; no render, browser test, CI test or Worker deployment was performed. This code milestone is not evidence that Blender is available in a runtime.
