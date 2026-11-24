@@ -115,3 +115,14 @@ Imported character meshes may animate shape keys (blend shapes) already present 
 ```
 
 The mesh target is optional only when the key name resolves to exactly one imported mesh. The key must already exist in the asset. Values are limited to -1 through 1 and frames must be strictly increasing. This schedules existing blend shapes; it does not create facial geometry, infer emotions, generate phonemes or synchronize lips to audio automatically.
+
+
+## Asset inspection (no render)
+
+Before authoring a character shot, inspect the actual asset to discover the names Claude can safely target:
+
+```bash
+blender --background --python blender/forge_blender_bridge.py -- --inspect-asset characters/original-hero.glb --assets-root ./assets
+```
+
+The command prints JSON containing imported object names/types, armature and bone names, mesh material names, existing shape-key names, and animation Actions with their source frame ranges. It does not create a render or video. Use the exact returned Action, Armature, mesh and shape-key names in the scene manifest. Only data imported from that asset is reported; this is not a guarantee that a particular rig is compatible with another character.
