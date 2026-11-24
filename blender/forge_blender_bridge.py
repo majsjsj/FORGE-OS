@@ -5,6 +5,7 @@ import json
 import math
 import os
 import sys
+from pathlib import Path
 
 import bpy
 from mathutils import Euler
@@ -26,7 +27,23 @@ def safe_name(value, fallback):
     text = str(value or fallback)
     return "".join(c if c.isalnum() or c in "-_ " else "_" for c in text)[:80] or fallback
 
-def build_materials(job):
+def asset_file(relative_path, assets_root, allowed_extensions):
+    if not isinstance(relative_path, str) or not relative_path or "\\" in relative_path:
+        raise ValueError("Asset paths must be non-empty relative paths.")
+    rel = Path(relative_path)
+    if rel.is_absolute() or any(part in ("", ".", "..") or part.startswith(".") for part in rel.parts):
+        raise ValueError("Unsafe asset path: %s" % relative_path)
+    if rel.suffix.lower() not in allowed_extensions:
+        raise ValueError("Unsupported asset extension: %s" % rel.suffix)
+    root = Path(assets_root).resolve()
+    target = (root / rel).resolve()
+    if os.path.commonpath((str(root), str(target))) != str(root) or not target.is_file():
+        raise FileNotFoundError("Asset is missing or outside the assets root: %s" % relative_path)
+    if target.stat().st_size > 512 * 1024 * 1024:
+        raise ValueError("Asset exceeds the 512 MiB per-file limit: %s" % relative_path)
+    return str(target)
+
+def build_materials(job, assets_root):
     result = {}
     for item in job.get("materials", []):
         mat = bpy.data.materials.new(name=safe_name(item.get("name"), item["id"]))
@@ -37,6 +54,12 @@ def build_materials(job):
             bsdf.inputs["Base Color"].default_value = mat.diffuse_color
             bsdf.inputs["Roughness"].default_value = float(item.get("roughness", 0.5))
             bsdf.inputs["Metallic"].default_value = float(item.get("metallic", 0.0))
+            if item.get("base_color_texture"):
+                image_path = asset_file(item["base_color_texture"], assets_root, {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff"})
+                image = bpy.data.images.load(image_path, check_existing=True)
+                texture = mat.node_tree.nodes.new("ShaderNodeTexImage")
+                texture.image = image
+                mat.node_tree.links.new(texture.outputs["Color"], bsdf.inputs["Base Color"])
         result[item["id"]] = mat
     return result
 
@@ -51,7 +74,29 @@ def animate(obj, keyframes):
                 setattr(obj, attr, value)
                 obj.keyframe_insert(data_path=attr, frame=frame)
 
-def create_scene(job, output_dir):
+def import_model(item, assets_root):
+    path = asset_file(item["asset"], assets_root, {".glb", ".gltf", ".fbx"})
+    before = set(bpy.data.objects)
+    extension = Path(path).suffix.lower()
+    if extension in (".glb", ".gltf"):
+        bpy.ops.import_scene.gltf(filepath=path)
+    elif extension == ".fbx":
+        bpy.ops.import_scene.fbx(filepath=path)
+    imported = [obj for obj in bpy.data.objects if obj not in before]
+    if not imported:
+        raise RuntimeError("Importer produced no objects for asset: %s" % item["asset"])
+    root = bpy.data.objects.new(safe_name(item.get("name"), item["id"]), None)
+    bpy.context.scene.collection.objects.link(root)
+    for obj in imported:
+        world = obj.matrix_world.copy()
+        obj.parent = root
+        obj.matrix_world = world
+    root.location = vec(item.get("location"), (0, 0, 0))
+    root.rotation_euler = tuple(math.radians(x) for x in vec(item.get("rotation"), (0, 0, 0)))
+    root.scale = vec(item.get("scale"), (1, 1, 1))
+    return root, imported
+
+def create_scene(job, output_dir, assets_root):
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     scene = bpy.context.scene
@@ -76,16 +121,24 @@ def create_scene(job, output_dir):
     world.node_tree.nodes["Background"].inputs["Color"].default_value = vec(settings.get("world_color"), (0.025, 0.03, 0.05, 1))
     world.node_tree.nodes["Background"].inputs["Strength"].default_value = float(settings.get("world_strength", 0.35))
 
-    materials = build_materials(job)
+    materials = build_materials(job, assets_root)
     for item in job.get("objects", []):
-        PRIMITIVES[item["type"]]()
-        obj = bpy.context.object
-        obj.name = safe_name(item.get("name"), item["id"])
-        obj.location = vec(item.get("location"), (0, 0, 0))
-        obj.rotation_euler = tuple(math.radians(x) for x in vec(item.get("rotation"), (0, 0, 0)))
-        obj.scale = vec(item.get("scale"), (1, 1, 1))
-        if item.get("material") in materials:
-            obj.data.materials.append(materials[item["material"]])
+        if item["type"] == "imported_model":
+            obj, imported_objects = import_model(item, assets_root)
+            if item.get("material") in materials:
+                for mesh_obj in imported_objects:
+                    if mesh_obj.type == "MESH":
+                        mesh_obj.data.materials.clear()
+                        mesh_obj.data.materials.append(materials[item["material"]])
+        else:
+            PRIMITIVES[item["type"]]()
+            obj = bpy.context.object
+            obj.name = safe_name(item.get("name"), item["id"])
+            obj.location = vec(item.get("location"), (0, 0, 0))
+            obj.rotation_euler = tuple(math.radians(x) for x in vec(item.get("rotation"), (0, 0, 0)))
+            obj.scale = vec(item.get("scale"), (1, 1, 1))
+            if item.get("material") in materials:
+                obj.data.materials.append(materials[item["material"]])
         animate(obj, item.get("keyframes"))
 
     for index, item in enumerate(job.get("lights", [])):
@@ -128,12 +181,13 @@ def main():
     parser = argparse.ArgumentParser(description="Render a FORGE MOTION Blender job")
     parser.add_argument("--job", required=True, help="Path to a version-1 BLENDER_JOB.json")
     parser.add_argument("--output", default="./renders", help="Output directory")
+    parser.add_argument("--assets-root", default="./assets", help="Directory containing approved model and texture assets")
     args = parser.parse_args(sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
     with open(args.job, "r", encoding="utf-8") as handle:
         job = json.load(handle)
     if job.get("version") != 1:
         raise SystemExit("Unsupported FORGE Blender job version; expected 1.")
-    result = create_scene(job, args.output)
+    result = create_scene(job, args.output, args.assets_root)
     print(json.dumps({"ok": True, "output": result, "frame_start": bpy.context.scene.frame_start,
                       "frame_end": bpy.context.scene.frame_end, "fps": bpy.context.scene.render.fps}))
 
