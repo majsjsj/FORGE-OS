@@ -967,7 +967,7 @@ function validateBlenderJob(job) {
       const start=Number(a.start_frame), end=Number(a.end_frame);
       if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end <= start || end > 1000000)
         throw new Error("Animation start_frame/end_frame must be an increasing positive frame range.");
-      for (const key of ["repeat","scale"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < (key==="repeat" ? 0.1 : 0.01) || Number(a[key]) > 100))
+      for (const key of ["repeat","speed"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < (key==="repeat" ? 0.1 : 0.01) || Number(a[key]) > 100))
         throw new Error("Animation " + key + " is out of range.");
       for (const key of ["blend_in","blend_out"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < 0 || Number(a[key]) > 1000))
         throw new Error("Animation " + key + " must be between 0 and 1000 frames.");
