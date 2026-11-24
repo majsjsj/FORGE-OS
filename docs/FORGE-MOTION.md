@@ -56,3 +56,12 @@ The UI does not itself provide AI transcription, generated video, Blender render
 ## Multitrack limitations
 
 This milestone provides a working local timeline and preview, not a frame-accurate nonlinear editor or final compositor. It does not composite multiple video layers, render imported images as overlays, burn captions into output, or export a final mixed MP4/WebM. Audio fades and gain are preview-only; waveform display, media relinking UI, frame-rate timebase, final audio mixdown, compositor/export pipeline and browser QA remain outstanding.
+
+
+## Local mixed WebM compositor milestone
+
+- Added a browser-side export action that records a 1280×720, 30 fps canvas composition to WebM and combines decoded narration/music/SFX clips into one Opus audio stream through Web Audio.
+- Export includes the active video clip, timed caption text, image assets on the graphics lane (when relinked), and editable text-card fallback for graphic title clips.
+- Audio clip start offsets, trim in/out, gain, fade-in and fade-out are scheduled in the Web Audio graph for the export.
+- The exporter is a first-pass real-time compositor: one active video layer at a time, basic centered image/title overlays, and simple bottom captions. It is not a frame-accurate NLE; no multi-video layer compositing, transitions between imported clips, color grading, keyframe animation, waveform UI, MP4/H.264 encoding, or browser QA are claimed.
+- Export requires media files to be available/relinked in the current browser session. The result is a local WebM download; no cloud rendering or paid service is invoked.
