@@ -36,6 +36,18 @@
       objectIds.add(o.id);
       if (!["cube", "uv_sphere", "cylinder", "cone", "plane", "torus", "monkey", "imported_model"].includes(o.type)) throw new Error("Unsupported object type: " + o.type);
       if (o.type === "imported_model" && (typeof o.asset !== "string" || !/^[A-Za-z0-9._/-]{1,240}$/.test(o.asset) || o.asset.startsWith("/") || o.asset.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(".")) || !/\.(glb|gltf|fbx)$/i.test(o.asset))) throw new Error("Model must use a safe relative GLB, GLTF or FBX asset path.");
+      if (o.animation !== undefined) {
+        const a = o.animation;
+        if (o.type !== "imported_model" || !a || typeof a !== "object" || Array.isArray(a) || typeof a.action !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.action)) throw new Error("Animation requires an imported model and an existing action name.");
+        if (a.target !== undefined && (typeof a.target !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.target))) throw new Error("Invalid animation Armature target.");
+        if (a.track_name !== undefined && (typeof a.track_name !== "string" || !/^[A-Za-z0-9 _.-]{1,120}$/.test(a.track_name))) throw new Error("Invalid animation track name.");
+        const aStart = Number(a.start_frame), aEnd = Number(a.end_frame);
+        if (!Number.isInteger(aStart) || !Number.isInteger(aEnd) || aStart < 1 || aEnd <= aStart || aEnd > 1000000) throw new Error("Animation requires an increasing positive start_frame/end_frame range.");
+        for (const key of ["repeat", "speed"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < (key === "repeat" ? 0.1 : 0.01) || Number(a[key]) > 100)) throw new Error("Animation " + key + " is out of range.");
+        for (const key of ["blend_in", "blend_out"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Number(a[key]) < 0 || Number(a[key]) > 1000)) throw new Error("Animation " + key + " is out of range.");
+        for (const key of ["action_start", "action_end"]) if (a[key] !== undefined && (!Number.isFinite(Number(a[key])) || Math.abs(Number(a[key])) > 1000000)) throw new Error("Animation source frame bounds are invalid.");
+        if (a.action_start !== undefined && a.action_end !== undefined && Number(a.action_end) <= Number(a.action_start)) throw new Error("Animation action_end must be greater than action_start.");
+      }
       for (const field of ["location", "rotation", "scale"]) if (o[field] !== undefined && !vector(o[field])) throw new Error("Invalid " + field + " vector on " + o.id);
       if (o.material && !ids.has(o.material)) throw new Error("Unknown material reference on " + o.id);
       if (o.keyframes !== undefined) {
