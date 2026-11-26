@@ -757,9 +757,8 @@ jobs:
         run: |
           mkdir -p "$PROJECT_PATH/build"
           if [ "$OUTPUT" = "web" ]; then
-            godot --headless --path "$PROJECT_PATH" --export-release "Web" "build/web.zip"
             mkdir -p "$PROJECT_PATH/build/web"
-            unzip -q "$PROJECT_PATH/build/web.zip" -d "$PROJECT_PATH/build/web"
+            godot --headless --path "$PROJECT_PATH" --export-release "Web" "$PROJECT_PATH/build/web/index.html"
             test -s "$PROJECT_PATH/build/web/index.html"
           else
             godot --headless --path "$PROJECT_PATH" --export-release "Linux" "build/linux.x86_64"
