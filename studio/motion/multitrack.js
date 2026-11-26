@@ -65,8 +65,8 @@ async function exportMixdown(){
   }
   const canvasStream=canvas.captureStream(fps),audioStream=mix.stream;
   audioStream.getAudioTracks().forEach(t=>canvasStream.addTrack(t));
-  const mime=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"].find(x=>MediaRecorder.isTypeSupported(x));
-  if(!mime)throw new Error("No supported WebM codec found.");
+  const mp4Types=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/mp4;codecs=avc1.4D401E,mp4a.40.2","video/mp4"];const webmTypes=["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"];const mime=mp4Types.find(x=>MediaRecorder.isTypeSupported(x))||webmTypes.find(x=>MediaRecorder.isTypeSupported(x));
+  if(!mime)throw new Error("This browser cannot record MP4 or WebM.");const isMp4=mime.startsWith("video/mp4");
   const chunks=[];recorder=new MediaRecorder(canvasStream,{mimeType:mime,videoBitsPerSecond:9000000,audioBitsPerSecond:192000});
   const imageCache=new Map();
   for(const a of assets.filter(a=>a.type==="graphics")){
@@ -84,7 +84,7 @@ async function exportMixdown(){
   }
   recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
   recorder.onerror=()=>setStatus("Recording failed in this browser.");
-  recorder.onstop=()=>{const blob=new Blob(chunks,{type:mime}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="forge-motion-mixed-edit.webm";a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);canvasStream.getTracks().forEach(t=>t.stop());audioCtx.close();button.disabled=false;setStatus("Export complete · "+(blob.size/1048576).toFixed(1)+" MB · mixed WebM saved locally.");};
+  recorder.onstop=async()=>{try{const blob=new Blob(chunks,{type:mime});if(isMp4){const sig=new Uint8Array(await blob.slice(0,16).arrayBuffer());const box=String.fromCharCode(...sig.slice(4,8));if(box!=="ftyp"&&box!=="styp")throw new Error("The browser did not produce a valid MP4 container; no file was downloaded.");}const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=isMp4?"forge-motion-mixed-edit.mp4":"forge-motion-mixed-edit.webm";a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);setStatus("Export complete · "+(blob.size/1048576).toFixed(1)+" MB · "+(isMp4?"MP4 / H.264 when provided by browser":"WebM fallback")+" saved locally.");}catch(err){setStatus("Export validation failed: "+err.message);}finally{canvasStream.getTracks().forEach(t=>t.stop());await audioCtx.close();button.disabled=false;}};
   recorder.start(250);const started=performance.now();let lastSeek=-1;
   function renderTick(now){const t=Math.min(duration,(now-started)/1000);const activeVideo=clips.filter(c=>c.type==="video"&&t>=Number(c.start||0)&&t<end(c)).sort((a,b)=>Number(b.start)-Number(a.start))[0];if(activeVideo){const pos=Number(activeVideo.in||0)+t-Number(activeVideo.start||0);if(videoId!==activeVideo.id){video.src=activeVideo.url||urls.get(activeVideo.assetId)||"";videoId=activeVideo.id;lastSeek=-1;}if(Math.abs(video.currentTime-pos)>.18&&video.readyState>=1){try{video.currentTime=pos;lastSeek=pos;}catch(e){}}if(video.paused)video.play().catch(()=>{});}else{video.pause();}frame(t);setStatus("Rendering "+t.toFixed(1)+" / "+duration.toFixed(1)+" sec");if(t<duration&&!stopped)rafId=requestAnimationFrame(renderTick);else if(recorder.state!=="inactive")recorder.stop();}
   renderTick(performance.now());
