@@ -29,3 +29,5 @@
 .level-cell{aspect-ratio:1;min-width:0;padding:0;border:1px solid #ffffff20;border-radius:3px;color:#fff;font-weight:800;font-size:clamp(8px,2vw,14px);cursor:pointer}
 #tilePalette button.active{outline:2px solid #fff;outline-offset:2px}
 @media(max-width:560px){.design-layout{grid-template-columns:1fr}.design-canvas{min-height:160px}.level-grid{gap:2px;padding:4px}.level-cell{border-radius:2px}}
+
+.forge-tools-nav>a{flex:none;display:inline-flex;align-items:center;border:1px solid #42605f;border-radius:5px;background:#172b30;color:#8ce9df;text-decoration:none;padding:7px 10px;font:700 9px ui-monospace,monospace}.forge-tools-nav>a:hover{border-color:#72e4db;background:#20383d}
