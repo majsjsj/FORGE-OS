@@ -14,7 +14,7 @@
 <button class="nav active" data-panel="brief">01 <span>Creative brief</span></button>
 <button class="nav" data-panel="storyboard">02 <span>Storyboard</span></button>
 <button class="nav" data-panel="timeline">03 <span>Timeline</span></button>
-<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button><button class="nav" data-panel="graphics">06 <span>Motion graphics</span></button><button class="nav" data-panel="multitrack">07 <span>Multitrack edit</span></button>
+<button class="nav" data-panel="sound">04 <span>Audio & voice</span></button><button class="nav" data-panel="post">05 <span>Video & captions</span></button><button class="nav" data-panel="graphics">06 <span>Motion graphics</span></button><button class="nav" data-panel="multitrack">07 <span>Multitrack edit</span></button><button class="nav" data-panel="clipper">08 <span>FORGE Clipper</span></button>
 <div class="rail-bottom"><div class="eyebrow">WORKSPACE STATUS</div><div class="status-line"><i></i> LOCAL PROJECT</div><p>Your project is saved in this browser. No cloud rendering or external AI service is invoked by this page.</p><a href="../index.html">← Back to FORGE Studio</a></div>
 </aside>
 <section class="content">
@@ -136,9 +136,44 @@
 </div>
 </div>
 </section>
+<section class="panel" id="panel-clipper">
+<div class="heading"><div><div class="eyebrow">SHORT-FORM REPURPOSING</div><h1>FORGE CLIPPER</h1><p>Turn authorized long-form footage into vertical clips, word-timed captions and publish-ready metadata.</p></div><span class="tag">LOCAL CLIP ENGINE</span></div>
+<div class="grid-two">
+<div class="card">
+<div class="card-title">SOURCE VIDEO</div>
+<label for="clipYoutubeUrl">YOUTUBE URL · SOURCE REFERENCE</label><input id="clipYoutubeUrl" type="url" placeholder="https://www.youtube.com/watch?v=...">
+<div class="row"><button id="clipParseUrl" class="quiet">CHECK LINK</button><button id="clipImportUrl" class="primary" type="button">IMPORT VIDEO FROM URL</button></div>
+<div id="clipUrlStatus" class="hint">Direct video-file URLs can be imported when the host permits browser access (CORS). YouTube watch URLs are references, not downloadable media streams.</div>
+<label class="upload" for="clipSourceFile">＋ LOAD VIDEO FILE<input id="clipSourceFile" type="file" accept="video/*"></label>
+<div class="hint" id="clipSourceStatus">Import a direct video file URL or load a video you own or are authorized to edit. Some hosts block browser imports; use an authorized downloadable file in that case.</div>
+<div class="clip-preview"><video id="clipSourceVideo" controls playsinline preload="metadata"></video></div>
+<div class="mt-two-fields"><div><label for="clipIn">CLIP IN · SEC</label><input id="clipIn" type="number" min="0" step=".1" value="0"></div><div><label for="clipOut">CLIP OUT · SEC</label><input id="clipOut" type="number" min=".1" step=".1" value="30"></div></div>
+<div class="row"><button id="clipUseRange" class="primary">USE THIS CLIP RANGE</button><button id="clipScanEnergy" class="quiet">FIND HIGH-ENERGY MOMENTS</button></div>
+<div id="clipCandidates" class="clip-candidates"><div class="empty">Load a video to inspect its duration and suggest energetic sections.</div></div>
+</div>
+<div class="card">
+<div class="card-title">OUTPUT FORMAT & DESIGN</div>
+<label for="clipFormat">PUBLISH FORMAT</label><select id="clipFormat"><option value="9:16">Shorts / Reels / TikTok · 9:16</option><option value="16:9">YouTube long-form · 16:9</option><option value="1:1">Square · 1:1</option><option value="4:5">Portrait feed · 4:5</option></select>
+<label class="checkline"><input id="clipBlurBg" type="checkbox" checked> BLURRED VIDEO BACKGROUND FOR PORTRAIT</label>
+<label for="clipHook">TOP HOOK / SUGGESTED OPENING TEXT</label><input id="clipHook" maxlength="90" placeholder="A surprising opening line...">
+<label for="clipCaptionText">CAPTIONS · FULL TRANSCRIPT</label><textarea id="clipCaptionText" rows="4" placeholder="Paste the spoken words for word-by-word captions..."></textarea>
+<div class="mt-two-fields"><div><label for="clipCaptionSize">CAPTION SIZE</label><input id="clipCaptionSize" type="range" min="24" max="68" value="44"></div><div><label for="clipCaptionColor">CAPTION COLOR</label><input id="clipCaptionColor" type="color" value="#ffffff"></div></div>
+<div class="mt-two-fields"><div><label for="clipCaptionStyle">CAPTION STYLE</label><select id="clipCaptionStyle"><option value="karaoke">Kinetic highlight</option><option value="pill">Active word pill</option><option value="outline">Heavy outline</option><option value="minimal">Clean minimal</option></select></div><div><label for="clipCaptionPosition">CAPTION POSITION</label><select id="clipCaptionPosition"><option value="bottom">Lower third</option><option value="center">Center</option><option value="top">Upper third</option></select></div></div>
+<label for="clipTitle">SUGGESTED TITLE</label><input id="clipTitle" maxlength="110" placeholder="A compelling, accurate title"><button id="clipSuggestMeta" class="quiet" type="button">SUGGEST TITLE & HASHTAGS</button>
+<label for="clipHashtags">HASHTAGS</label><input id="clipHashtags" placeholder="#shorts #story #learn">
+<label for="clipDuration">TARGET CLIP LENGTH</label><select id="clipDuration"><option value="20">20 seconds</option><option value="30" selected>30 seconds</option><option value="45">45 seconds</option><option value="60">60 seconds</option><option value="90">90 seconds</option></select>
+<div class="row"><button id="clipPreviewBtn" class="quiet">PREVIEW DESIGN</button><button id="clipExportBtn" class="primary">RENDER CLIP MP4 / WEBM</button></div>
+<div id="clipStatus" class="hint" role="status">Ready · local rendering uses browser codec support and may fall back to WebM.</div>
+</div>
+</div>
+<div class="card">
+<div class="card-title">CLIP OUTPUT PREVIEW</div><div class="clip-render-stage"><canvas id="clipCanvas" width="720" height="1280"></canvas></div>
+<div class="hint">The renderer creates a blurred duplicate of the same frame behind the original footage, adds the optional top hook, and highlights each caption word in sequence. Transcript timing is estimated evenly until word-level speech alignment is connected.</div>
+</div>
+</section>
 <section class="panel" id="panel-multitrack">
 <div class="heading"><div><div class="eyebrow">EDIT & MIX</div><h1>Multitrack editor</h1><p>Arrange local media on independent tracks, trim clips, set timing and shape audio fades.</p></div><span class="tag">LOCAL TIMELINE</span></div>
-<div class="card director-card"><div class="director-head"><div><div class="card-title">CLAUDE · EXECUTIVE DIRECTOR</div><strong id="directorStatus">Awaiting Claude production plan</strong><div class="hint">Claude decides scene count, exact timing, clip placement and total runtime. The editor follows the approved director plan.</div></div><label class="upload compact-upload">LOAD CLAUDE PLAN JSON<input id="directorPlanFile" type="file" accept="application/json"></label></div><div class="row"><button id="directorExportPlan" class="quiet">EXPORT CURRENT PLAN</button><button id="directorClearPlan" class="quiet">CLEAR DIRECTOR PLAN</button><span id="directorRuntime" class="mt-clock">RUNTIME · NOT SET</span></div><div class="director-connect"><label>PROJECT BRANCH<input id="directorBranch" placeholder="forge/projects/my-film"></label><label>PROJECT PATH<input id="directorProject" placeholder="workspace/my-film"></label><button id="directorConnect" class="primary">CONNECT TO CLAUDE MCP</button><button id="directorDisconnect" class="quiet">DISCONNECT</button></div><div class="hint" id="directorConnectionStatus">Connect this studio to the same isolated project branch Claude uses. Published MCP plans will sync automatically; no access token is stored in the browser.</div></div><div class="card mt-toolbar"><div class="row"><button id="mtPlay" class="primary">▶ PLAY</button><button id="mtStop" class="quiet">STOP</button><button id="mtAddCaption" class="quiet">＋ TEXT CLIP</button><button id="mtAddGraphic" class="quiet">＋ GRAPHIC CARD</button><button id="mtExport" class="primary">EXPORT MIXED WEBM</button><span id="mtClock" class="mt-clock">00:00.0</span></div><label for="mtPlayhead">PLAYHEAD / SCRUB</label><input id="mtPlayhead" type="range" min="0" max="60" step="0.05" value="0"><div class="hint">Import media into its matching track. Clip timing and edit settings are saved in the project; local media files must be reselected after reopening or importing on another device.</div></div>
+<div class="card director-card"><div class="director-head"><div><div class="card-title">CLAUDE · EXECUTIVE DIRECTOR</div><strong id="directorStatus">Awaiting Claude production plan</strong><div class="hint">Claude decides scene count, exact timing, clip placement and total runtime. The editor follows the approved director plan.</div></div><label class="upload compact-upload">LOAD CLAUDE PLAN JSON<input id="directorPlanFile" type="file" accept="application/json"></label></div><div class="row"><button id="directorExportPlan" class="quiet">EXPORT CURRENT PLAN</button><button id="directorClearPlan" class="quiet">CLEAR DIRECTOR PLAN</button><span id="directorRuntime" class="mt-clock">RUNTIME · NOT SET</span></div><div class="director-connect"><label>PROJECT BRANCH<input id="directorBranch" placeholder="forge/projects/my-film"></label><label>PROJECT PATH<input id="directorProject" placeholder="workspace/my-film"></label><button id="directorConnect" class="primary">CONNECT TO CLAUDE MCP</button><button id="directorDisconnect" class="quiet">DISCONNECT</button></div><div class="hint" id="directorConnectionStatus">Connect this studio to the same isolated project branch Claude uses. Published MCP plans will sync automatically; no access token is stored in the browser.</div></div><div class="card mt-toolbar"><div class="row"><button id="mtPlay" class="primary">▶ PLAY</button><button id="mtStop" class="quiet">STOP</button><button id="mtAddCaption" class="quiet">＋ TEXT CLIP</button><button id="mtAddGraphic" class="quiet">＋ GRAPHIC CARD</button><button id="mtSplit" class="quiet">SPLIT AT PLAYHEAD</button><button id="mtDuplicate" class="quiet">DUPLICATE CLIP</button><button id="mtNudgeBack" class="quiet">← 0.5s</button><button id="mtNudgeForward" class="quiet">0.5s →</button><button id="mtExport" class="primary">EXPORT MP4 / WEBM</button><span id="mtClock" class="mt-clock">00:00.0</span></div><label for="mtPlayhead">PLAYHEAD / SCRUB</label><input id="mtPlayhead" type="range" min="0" max="60" step="0.05" value="0"><div class="hint">Import media into its matching track. Clip timing and edit settings are saved in the project; local media files must be reselected after reopening or importing on another device.</div></div>
 <div class="grid-two mt-workspace">
 <div class="card"><div class="card-title">TRACK TIMELINE</div><div id="mtTimeline" class="mt-timeline"></div><div class="mt-scale"><span>0s</span><span>10s</span><span>20s</span><span>30s</span><span>40s</span><span>50s</span><span>60s</span></div></div>
 <div class="card"><div class="card-title">CLIP INSPECTOR</div><div id="mtInspector" class="mt-inspector"><div class="empty">Select a clip to edit its timing and audio.</div></div></div>
@@ -151,7 +186,7 @@
 <label class="upload">＋ SOUND FX · A3<input type="file" accept="audio/*" multiple data-mt-import="sfx"></label>
 <label class="upload">＋ GRAPHICS · G1<input type="file" accept="image/*" data-mt-import="graphics"></label>
 </div><div id="mtAssets" class="mt-assets"><div class="empty">Imported media will appear here.</div></div></div>
-<div class="card"><div class="card-title">PREVIEW MONITOR</div><div class="mt-preview"><video id="mtVideo" playsinline preload="metadata"></video><div id="mtTextOverlay" class="mt-text-overlay"></div><div id="mtPreviewEmpty">SELECT A VIDEO OR TEXT CLIP</div></div><div class="hint" id="mtPreviewStatus">Preview follows the timeline playhead. Export creates a local 30 fps WebM composite with a mixed audio track.</div><div class="hint" id="mtExportStatus" role="status">Ready to export · media files must be linked in this browser session.</div><div class="card"><div class="card-title">LOCAL AUDIO INTELLIGENCE</div><p class="hint">Analyze a selected narration, music or SFX asset in this browser. Audio bytes stay local; only derived timing metrics can be included in a Claude handoff.</p><div class="row"><button id="mtAnalyzeAudio" class="primary">ANALYZE SELECTED AUDIO</button><span id="mtAnalysisStatus" class="mt-clock">NO ANALYSIS</span></div><canvas id="mtWaveform" class="mt-waveform" width="1200" height="170"></canvas><div id="mtAudioAnalysis" class="mt-analysis"><span>Select an audio clip on the timeline, then analyze it.</span></div></div><canvas id="mtExportCanvas" width="1280" height="720" hidden></canvas></div>
+<div class="card"><div class="card-title">PREVIEW MONITOR</div><div class="mt-preview"><video id="mtVideo" playsinline preload="metadata"></video><div id="mtTextOverlay" class="mt-text-overlay"></div><div id="mtPreviewEmpty">SELECT A VIDEO OR TEXT CLIP</div></div><div class="hint" id="mtPreviewStatus">Preview follows the timeline playhead. Export creates a local 30 fps MP4/H.264 + AAC file when this browser supports it; otherwise it falls back to WebM with mixed audio.</div><div class="hint" id="mtExportStatus" role="status">Ready to export · media files must be linked in this browser session.</div><div class="card"><div class="card-title">LOCAL AUDIO INTELLIGENCE</div><p class="hint">Analyze a selected narration, music or SFX asset in this browser. Audio bytes stay local; only derived timing metrics can be included in a Claude handoff.</p><div class="row"><button id="mtAnalyzeAudio" class="primary">ANALYZE SELECTED AUDIO</button><span id="mtAnalysisStatus" class="mt-clock">NO ANALYSIS</span></div><canvas id="mtWaveform" class="mt-waveform" width="1200" height="170"></canvas><div id="mtAudioAnalysis" class="mt-analysis"><span>Select an audio clip on the timeline, then analyze it.</span></div></div><canvas id="mtExportCanvas" width="1280" height="720" hidden></canvas></div>
 </div>
 </section>
 <section class="panel" id="panel-graphics">
@@ -198,7 +233,7 @@
 <div class="eyebrow">SHOT MONITOR</div><div class="monitor" id="monitor"><div class="monitor-art"><span>FORGE</span><b>MOTION</b><small>PREVIEW CANVAS</small></div></div>
 <div class="monitor-meta"><span id="monitorScene">NO SHOT SELECTED</span><span id="monitorFormat">16:9</span></div>
 <div class="card compact"><div class="card-title">SELECTED SHOT</div><div id="shotInspector" class="hint">Select a scene to edit its production details.</div></div>
-<div class="render-note"><b>Render status</b><span class="status-pill">LOCAL 2D RENDER + PLANNING</span><p>Motion graphics can render locally to WebM. Blender, AI video and full multitrack production still require their dedicated engines.</p></div>
+<div class="render-note"><b>Render status</b><span class="status-pill">LOCAL 2D RENDER + PLANNING</span><p>Motion graphics and multitrack edits can export locally to MP4 when the browser has H.264/AAC recording support, with WebM fallback. Blender and AI video require dedicated engines.</p></div>
 </aside>
 </main>
 <footer class="footer"><span>FORGE MOTION · CREATIVE PRODUCTION</span><span id="saveStatus">SAVED LOCALLY</span><span>NO CLOUD JOBS RUNNING</span></footer>
@@ -206,7 +241,7 @@
 <script src="motion.js"></script>
 <script src="post-production.js"></script>
 <script src="motion-graphics.js"></script>
-<script src="multitrack.js"></script>
+<script src="multitrack.js"></script>\n<script src="clipper.js"></script>
 <script src="director.js"></script>
 <script src="creative-bible.js"></script>\n<script src="asset-rights.js"></script>
 <script src="blender-bridge-ui.js"></script>
