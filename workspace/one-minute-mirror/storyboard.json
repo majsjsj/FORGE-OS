@@ -1,0 +1,126 @@
+{
+  "project": "the-reflection-blinked-first",
+  "title_ar": "الصورة التي رمشت قبلي",
+  "format": "2D articulated psychological-horror short",
+  "runtime_seconds": 60,
+  "master": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "aspect_ratio": "16:9"
+  },
+  "render_motion_on_twos": true,
+  "render_source_fps": 12,
+  "final_delivery": {
+    "video": "H.264 MP4",
+    "audio": "AAC stereo",
+    "captions": "Arabic burned-in and SRT sidecar"
+  },
+  "originality": {
+    "characters": "original",
+    "environment": "original",
+    "score_and_sfx": "procedurally synthesized for this production"
+  },
+  "characters": [
+    {
+      "id": "adam",
+      "role": "protagonist",
+      "rig": [
+        "head",
+        "neck",
+        "torso",
+        "left_shoulder",
+        "left_elbow",
+        "left_wrist",
+        "right_shoulder",
+        "right_elbow",
+        "right_wrist",
+        "left_hip",
+        "left_knee",
+        "left_ankle",
+        "right_hip",
+        "right_knee",
+        "right_ankle"
+      ],
+      "performance": [
+        "blink",
+        "eye_gaze",
+        "brow_raise",
+        "mouth_open",
+        "fear",
+        "retreat"
+      ]
+    },
+    {
+      "id": "reflection",
+      "role": "antagonistic_reflection",
+      "rig": "same skeleton with independent timing and pose offsets",
+      "performance": [
+        "early_blink",
+        "anticipatory_arm_raise",
+        "pointing",
+        "non-mirroring_pose",
+        "direct_to_viewer_smile"
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "start": 0,
+      "end": 4.35,
+      "name": "Hook",
+      "camera": "quiet medium-wide push",
+      "action": "The mirror is already occupied; a direct warning opens the story",
+      "retention": "Threat + unresolved rule"
+    },
+    {
+      "start": 4.35,
+      "end": 14.2,
+      "name": "First impossible motion",
+      "camera": "slow push to mirror",
+      "action": "At 02:13 the reflection blinks and raises its arm before Adam",
+      "retention": "Pattern violation and proof"
+    },
+    {
+      "start": 14.2,
+      "end": 27,
+      "name": "The warning",
+      "camera": "closer mirror framing",
+      "action": "Adam freezes; the reflection writes the word اهرب on the glass",
+      "retention": "A concrete instruction creates a new question"
+    },
+    {
+      "start": 27,
+      "end": 41,
+      "name": "The voice behind him",
+      "camera": "reframe between door and mirror",
+      "action": "Adam hears his own voice behind him but refuses to turn",
+      "retention": "Auditory threat and delayed confirmation"
+    },
+    {
+      "start": 41,
+      "end": 55,
+      "name": "Broken reflection",
+      "camera": "decisive push-in with light flicker",
+      "action": "The mirror stops reflecting Adam; the room blacks out and Adam disappears",
+      "retention": "Payoff to the opening rule"
+    },
+    {
+      "start": 55,
+      "end": 60,
+      "name": "Viewer-directed twist",
+      "camera": "extreme close-up / hold",
+      "action": "The reflection smiles at the lens; the final caption reveals it was looking at the viewer",
+      "retention": "Fourth-wall reveal and quiet ending"
+    }
+  ],
+  "psychology_notes": [
+    "Open with a clear threat before explaining context.",
+    "Introduce the anomaly early, then delay the full explanation.",
+    "Use a repeated visual rule (reflection copies Adam) so breaking it is immediately legible.",
+    "Turn the mirror word into a specific question: what is Adam meant to run from?",
+    "Escalate from visual anomaly to sound cue to disappearance.",
+    "Resolve the mystery by changing the target from Adam to the viewer."
+  ],
+  "safety_and_rights": "Original fictional story; no real-person allegation, franchise character, or third-party footage is used."
+}
