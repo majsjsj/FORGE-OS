@@ -42,3 +42,7 @@
 .mt-toolbar #mtNudgeBack,.mt-toolbar #mtNudgeForward{min-width:76px}
 .mt-clip.selected{outline:2px solid var(--accent);outline-offset:1px;z-index:2}
 @media(max-width:760px){.mt-toolbar .row{gap:6px}.mt-toolbar .row button{font-size:9px;padding:8px}.mt-workspace{grid-template-columns:1fr}}
+
+
+/* FORGE CLIPPER */
+.clip-preview{background:#080b11;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:12px 0;aspect-ratio:16/9;display:grid;place-items:center}.clip-preview video{width:100%;height:100%;object-fit:contain;max-height:360px}.clip-render-stage{background:#080b11;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;padding:14px;min-height:260px}.clip-render-stage canvas{display:block;max-width:min(100%,420px);max-height:75vh;width:auto;height:auto;aspect-ratio:9/16;background:#111}.clip-candidates{display:grid;gap:8px;margin-top:12px}.clip-candidate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.clip-candidate small{display:block;color:var(--muted)}.checkline{display:flex;align-items:center;gap:9px;margin:12px 0;color:var(--muted)}.checkline input{width:auto}.clip-candidate button{white-space:nowrap}
