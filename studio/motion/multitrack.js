@@ -31,6 +31,35 @@ $("mtInspector").addEventListener("input",e=>{if(e.target.dataset.p==="volume"){
 $("mtInspector").addEventListener("click",e=>{if(e.target.id==="mtDelete"){clips=clips.filter(c=>c.id!==selected);selected=null;render();}if(e.target.id==="mtGoto"){head=Number(clips.find(c=>c.id===selected)?.start)||0;render();}});
 $("mtAddCaption").addEventListener("click",()=>{const c={id:id(),type:"captions",name:"Caption",text:"Your caption",start:head,in:0,out:3,duration:3};clips.push(c);selected=c.id;render();});
 $("mtAddGraphic").addEventListener("click",()=>{const c={id:id(),type:"graphics",name:"Graphic title",text:"YOUR TITLE",start:head,in:0,out:5,duration:5};clips.push(c);selected=c.id;render();});
+
+function selectedClip(){return clips.find(c=>c.id===selected)||null;}
+function splitSelectedAtPlayhead(){
+ const c=selectedClip();if(!c){$("mtExportStatus").textContent="Select a clip before splitting.";return;}
+ const start=Number(c.start)||0,cut=head-start,clipLength=len(c);
+ if(cut<.05||cut>clipLength-.05){$("mtExportStatus").textContent="Move the playhead inside the selected clip to split it.";return;}
+ const sourceCut=Number(c.in||0)+cut,oldOut=Number(c.out??c.duration??5);
+ const right={...c,id:id(),name:(c.name||"Clip")+" · B",start:head,in:sourceCut,out:oldOut,duration:oldOut-sourceCut,url:c.url||null,file:c.file||null};
+ c.out=sourceCut;c.duration=sourceCut-Number(c.in||0);c.name=(c.name||"Clip")+" · A";
+ if(Array.isArray(c.words)){
+  const elapsed=cut,leftWords=c.words.filter(w=>Number(w.end)<=elapsed),rightWords=c.words.filter(w=>Number(w.end)>elapsed).map(w=>({...w,start:Math.max(0,Number(w.start)-elapsed),end:Number(w.end)-elapsed}));
+  c.words=leftWords;right.words=rightWords;
+ }
+ clips.push(right);selected=right.id;render();$("mtExportStatus").textContent="Clip split at "+stamp(head)+".";
+}
+function duplicateSelected(){
+ const c=selectedClip();if(!c){$("mtExportStatus").textContent="Select a clip to duplicate.";return;}
+ const copy={...c,id:id(),name:(c.name||"Clip")+" · COPY",start:end(c),words:Array.isArray(c.words)?c.words.map(w=>({...w})):c.words};
+ clips.push(copy);selected=copy.id;head=Number(copy.start)||0;render();$("mtExportStatus").textContent="Duplicate created after the original clip.";
+}
+function nudgeSelected(delta){
+ const c=selectedClip();if(!c){$("mtExportStatus").textContent="Select a clip to move.";return;}
+ c.start=Math.max(0,(Number(c.start)||0)+delta);head=c.start;render();$("mtExportStatus").textContent="Clip moved "+(delta>0?"forward":"back")+" by "+Math.abs(delta).toFixed(1)+" sec.";
+}
+$("mtSplit").addEventListener("click",splitSelectedAtPlayhead);
+$("mtDuplicate").addEventListener("click",duplicateSelected);
+$("mtNudgeBack").addEventListener("click",()=>nudgeSelected(-.5));
+$("mtNudgeForward").addEventListener("click",()=>nudgeSelected(.5));
+
 $("mtPlayhead").addEventListener("input",e=>{head=Number(e.target.value);$("mtClock").textContent=stamp(head);preview();});
 function active(type){return clips.filter(c=>c.type===type&&head>=Number(c.start||0)&&head<end(c)).sort((a,b)=>Number(b.start)-Number(a.start))[0]||null;}
 function syncAudio(){clips.filter(c=>["narration","music","sfx"].includes(c.type)).forEach(c=>{let a=audios.get(c.id);if(!a){a=new Audio();a.preload="auto";a.src=c.url||urls.get(c.assetId)||"";audios.set(c.id,a);}const start=Number(c.start)||0,inside=head>=start&&head<end(c),src=c.url||urls.get(c.assetId);if(!src||!inside){a.pause();return;}const pos=Number(c.in||0)+head-start;if(Math.abs(a.currentTime-pos)>.3)a.currentTime=pos;let vol=Number(c.volume??1);if(c.fadeIn>0)vol*=Math.min(1,(head-start)/c.fadeIn);if(c.fadeOut>0)vol*=Math.min(1,(end(c)-head)/c.fadeOut);a.volume=Math.max(0,Math.min(1,vol));if(playing&&a.paused)a.play().catch(()=>{});if(!playing)a.pause();});}
